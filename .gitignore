@@ -1,0 +1,9 @@
+db.sqlite3.old
+manage.py
+ngrok.exe
+LiveChat/__pycache__/*
+LiveChat/settings.py
+.vscode/*
+livechatapp/__pycache__/*
+livechatapp/migrations/*
+livechatapp/.env
