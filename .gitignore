@@ -6,4 +6,4 @@ LiveChat/settings.py
 .vscode/*
 livechatapp/__pycache__/*
 livechatapp/migrations/*
-livechatapp/.env
+livechatapp/controllers/.env

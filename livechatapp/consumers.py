@@ -1,6 +1,6 @@
 # chat/consumers.py
 import json, re
-from .controller import controller
+from .controllers.main import twilio_controller
 from channels.generic.websocket import AsyncWebsocketConsumer
 
  #+14074910011 or 14074910011 or 4074910011
@@ -38,14 +38,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
             message = body[len(body)-1].strip()
 
             try:
-                await controller.connect(destination="Twilio")
-                result = await controller.twilio_send_message(to_number=to_number,body=message)
+                await twilio_controller.connect(destination="Twilio")
+                result = await twilio_controller.twilio_send_message(to_number=to_number,body=message)
 
                 if result == False:
                     message = "Failed to send message. {}".format(message)
             except IndexError as e:
                 message = "Failed to send message. {}".format(e)
-                pass
 
         # Send message to room group
         await self.channel_layer.group_send(
