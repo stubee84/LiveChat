@@ -97,7 +97,7 @@ class google_controller:
         google_controller.connect(destination="speech")
         response = requests.get(url=recording_url, stream=True)
 
-        requests = speech.StreamingRecognizeRequest(audio_content=response.iter_content())
+        requests = (speech.StreamingRecognizeRequest(audio_content=chunk) for chunk in response.iter_content())
         config = speech.RecognitionConfig(
             encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
             sample_rate_hertz=8000,
