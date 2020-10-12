@@ -50,10 +50,13 @@ def voice(request: request.HttpRequest):
         return
 
 @csrf_exempt
+#TODO: configure the recording as an asynchronous thread
 def record(request: request.HttpRequest):
     try:
         twilio_signature = request.META['HTTP_X_TWILIO_SIGNATURE']
-        gcs_uri = google_controller.download_audio_and_transcribe(recording_sid=request.POST.get("RecordingSid"), recording_url=request.POST.get("RecordingUrl"))
+        transcript = google_controller.download_audio_and_transcribe(recording_url=request.POST.get("RecordingUrl"))
+        print(transcript)
+        # gcs_uri = google_controller.download_audio_and_upload(recording_sid=request.POST.get("RecordingSid"), recording_url=request.POST.get("RecordingUrl"))
         # transcript = google_controller.transcribe_audio(gcs_uri=gcs_uri)
         return HttpResponse()
     except KeyError:

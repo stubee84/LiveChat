@@ -92,12 +92,12 @@ class google_controller:
             print(e)
             return False
 
-    def download_audio_and_transcribe():
-        chunk_resp: requests.Response = None
+    def download_audio_and_transcribe(recording_url: str) -> str:
+        transcription: str = ""
         google_controller.connect(destination="speech")
         response = requests.get(url=recording_url, stream=True)
 
-        requests = (speech.StreamingRecognizeRequest(audio_content=chunk) for chunk in response.iter_content())
+        reqs = (speech.StreamingRecognizeRequest(audio_content=chunk) for chunk in response.iter_content())
         config = speech.RecognitionConfig(
             encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
             sample_rate_hertz=8000,
@@ -105,20 +105,22 @@ class google_controller:
         )
         streaming_config = speech.StreamingRecognitionConfig(config=config)
 
-        responses = google_controller.speech_client.streaming_recognize(config=streaming_config, requests=requests,)
+        responses = google_controller.speech_client.streaming_recognize(config=streaming_config, requests=reqs,)
 
         for response in responses:
             # Once the transcription has settled, the first result will contain the
             # is_final result. The other results will be for subsequent portions of
             # the audio.
             for result in response.results:
-                print("Finished: {}".format(result.is_final))
-                print("Stability: {}".format(result.stability))
+                # print("Finished: {}".format(result.is_final))
+                # print("Stability: {}".format(result.stability))
                 alternatives = result.alternatives
                 # The alternatives are ordered from most likely to least.
                 for alternative in alternatives:
-                    print("Confidence: {}".format(alternative.confidence))
-                    print(u"Transcript: {}".format(alternative.transcript))
+                    # print("Confidence: {}".format(alternative.confidence))
+                    transcription = u"Transcript: {}".format(alternative.transcript)
+
+        return transcription
 
 class twilio_controller:
     #Rest client variable. Maybe call this rest_clients
