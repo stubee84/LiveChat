@@ -128,7 +128,7 @@ class twilio_controller:
     
     async def connect(**kwargs):
         try:
-            if kwargs['destination'] == "Twilio":
+            if kwargs['destination'].lower() == "twilio":
                 await twilio_controller.twilio_connect(sid=sid,token=token)
         except KeyError:
             return
@@ -139,8 +139,21 @@ class twilio_controller:
             twilio_controller.twilio_client = twilio.rest.Client(username=sid,password=token)
         
     async def twilio_send_message(to_number: str, body: str) -> bool:
-        result = twilio_controller.twilio_client.messages.create(to=to_number,from_=phone_number,body=body)
+        result = await twilio_controller.twilio_client.messages.create(to=to_number,from_=phone_number,body=body)
         #possibly change this to query the URI for status once it has been sent or received
         if result._properties["status"] == "queued":
             return True
         return False
+
+    async def twilio_call_with_recording(from_number: str, to_number: str, msg: str) -> bool:
+        twiml = f'''<Response>
+            <Say>
+                {msg}
+            </Say>
+        </Response>'''
+        await twilio_controller.twilio_client.calls.create(to=to_number, from_=from_number, twiml=twiml)
+        return True
+
+    async def get_call_info(call_sid: str) -> str:
+        from_number = await twilio_controller.twilio_client.calls(call_sid).fetch().from_formatted
+        return from_number

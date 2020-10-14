@@ -1,5 +1,7 @@
 from django.shortcuts import render
-import json, websocket, threading, django.http.request as request
+import json, websocket, asyncio, channels.layers, django.http.request as request
+from asgiref.sync import async_to_sync
+from .consumers import ChatConsumer
 from .controllers.main import twilio_controller, google_controller
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
@@ -44,6 +46,12 @@ def voice(request: request.HttpRequest):
         #without an action or recording_status_callbath attribute then you will have an endless loop of calling into the view
         resp.record(play_beep=True, max_length=30, finish_on_key="#", recording_status_callback="/chat/record/", action="/chat/hangup/")
         resp.hangup()
+
+        channel_layer = channels.layers.get_channel_layer()
+        async_to_sync(channel_layer.group_send)("chat_lobby", {
+            "type": "chat_message",
+            "message": 'Incoming recording...'
+        })
     
         return HttpResponse(str(resp))
     except KeyError:
@@ -54,8 +62,21 @@ def voice(request: request.HttpRequest):
 def record(request: request.HttpRequest):
     try:
         twilio_signature = request.META['HTTP_X_TWILIO_SIGNATURE']
+        call_sid = request.POST.get("CallSid")
+        
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(twilio_controller.connect(destination="twilio"))
+        caller = loop.run_until_complete(twilio_controller.get_call_info(call_sid=call_sid))
+
         transcript = google_controller.download_audio_and_transcribe(recording_url=request.POST.get("RecordingUrl"))
         print(transcript)
+        channel_layer = channels.layers.get_channel_layer()
+        async_to_sync(channel_layer.group_send)("chat_lobby", {
+            "type": "chat_message",
+            "message": f'{caller} - {transcript}'
+        })
+        
         # gcs_uri = google_controller.download_audio_and_upload(recording_sid=request.POST.get("RecordingSid"), recording_url=request.POST.get("RecordingUrl"))
         # transcript = google_controller.transcribe_audio(gcs_uri=gcs_uri)
         return HttpResponse()

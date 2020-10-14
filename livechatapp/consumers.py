@@ -26,6 +26,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
 
+    async def get_group_names(self) -> dict:
+        return {
+            "room_name": self.room_name,
+            "room_group_name": self.room_group_name,
+            "channel_name": self.channel_name
+        }
+
     # Receive message from WebSocket
     async def receive(self, text_data):
         text_data_json = json.loads(text_data)
