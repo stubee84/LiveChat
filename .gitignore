@@ -2,7 +2,7 @@ db.sqlite3.old
 manage.py
 ngrok.exe
 LiveChat/__pycache__/
-LiveChat/settings.py
+LiveChat/.env
 .vscode/
 livechatapp/__pycache__/
 livechatapp/controllers/__pycache__/

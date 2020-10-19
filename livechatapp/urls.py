@@ -8,5 +8,6 @@ urlpatterns = [
     path('voice/', views.voice, name='voice'),
     path('record/', views.record, name='record'),
     path('hangup/', views.hangup, name='hangup'),
+    path('menu/', views.menu, name='menu'),
     path('<str:room_name>/', views.room, name='room'),
 ]

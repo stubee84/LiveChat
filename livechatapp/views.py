@@ -2,10 +2,10 @@ from django.shortcuts import render
 import json, websocket, asyncio, channels.layers, django.http.request as request
 from asgiref.sync import async_to_sync
 from .consumers import ChatConsumer
-from .controllers.main import twilio_controller, google_controller
+from .controllers import main
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
-from twilio.twiml.voice_response import VoiceResponse
+from twilio.twiml.voice_response import VoiceResponse, Connect, Stream
 from twilio.request_validator import RequestValidator
 
 # Create your views here.
@@ -42,20 +42,44 @@ def voice(request: request.HttpRequest):
     try:
         twilio_signature = request.META['HTTP_X_TWILIO_SIGNATURE']
         resp = VoiceResponse()
-        resp.say("Please leave a message. Press the pound or hash key to end the recording.")
-        #without an action or recording_status_callbath attribute then you will have an endless loop of calling into the view
-        resp.record(play_beep=True, max_length=30, finish_on_key="#", recording_status_callback="/chat/record/", action="/chat/hangup/")
-        resp.hangup()
-
-        channel_layer = channels.layers.get_channel_layer()
-        async_to_sync(channel_layer.group_send)("chat_lobby", {
-            "type": "chat_message",
-            "message": 'Incoming recording...'
-        })
+        with resp.gather(num_digits=1, action="/chat/menu/", method="POST", timeout=3) as gather:
+            gather.say(message="Press 1 to record a message or press 2 stream the voice call.", loop=1)
     
         return HttpResponse(str(resp))
     except KeyError:
         return
+
+@csrf_exempt
+def menu(request: request.HttpRequest):
+    try:
+        twilio_signature = request.META['HTTP_X_TWILIO_SIGNATURE']
+        digit = request.POST.get('Digits')
+
+        resp = VoiceResponse()
+        #record
+        if digit == '1':
+            resp.say("Please leave a message. Press the pound or hash key to end the recording.")
+            #without an action or recording_status_callbath attribute then you will have an endless loop of calling into the view
+            resp.record(play_beep=True, max_length=30, finish_on_key="#", recording_status_callback="/chat/record/", action="/chat/hangup/")
+
+            channel_layer = channels.layers.get_channel_layer()
+            async_to_sync(channel_layer.group_send)("chat_lobby", {
+                "type": "chat_message",
+                "message": 'Incoming recording...'
+            })
+        elif digit == '2':
+            resp.say("Please begin speaking...")
+            connect = Connect()
+            connect.stream(url=main.ws_url)
+            resp.append(connect)
+        else:
+            resp.say("Incorrect entry. Please try again.")
+            resp.redirect('/chat/voice/')
+        
+        return HttpResponse(str(resp))
+    except KeyError:
+        return
+            
 
 @csrf_exempt
 #TODO: configure the recording as an asynchronous thread
@@ -66,10 +90,10 @@ def record(request: request.HttpRequest):
         
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.run_until_complete(twilio_controller.connect(destination="twilio"))
-        caller = loop.run_until_complete(twilio_controller.get_call_info(call_sid=call_sid))
+        loop.run_until_complete(main.twilio_controller.connect(destination="twilio"))
+        caller = loop.run_until_complete(main.twilio_controller.get_call_info(call_sid=call_sid))
 
-        transcript = google_controller.download_audio_and_transcribe(recording_url=request.POST.get("RecordingUrl"))
+        transcript = main.google_controller.download_audio_and_transcribe(recording_url=request.POST.get("RecordingUrl"))
         print(transcript)
         channel_layer = channels.layers.get_channel_layer()
         async_to_sync(channel_layer.group_send)("chat_lobby", {
@@ -77,8 +101,8 @@ def record(request: request.HttpRequest):
             "message": f'{caller} - {transcript}'
         })
         
-        # gcs_uri = google_controller.download_audio_and_upload(recording_sid=request.POST.get("RecordingSid"), recording_url=request.POST.get("RecordingUrl"))
-        # transcript = google_controller.transcribe_audio(gcs_uri=gcs_uri)
+        # gcs_uri = main.google_controller.download_audio_and_upload(recording_sid=request.POST.get("RecordingSid"), recording_url=request.POST.get("RecordingUrl"))
+        # transcript = main.google_controller.transcribe_audio(gcs_uri=gcs_uri)
         return HttpResponse()
     except KeyError:
         return

@@ -10,6 +10,7 @@ load_dotenv(dotenv_path=dotenv_path)
 sid = os.environ.get("TWILIO_ACCOUNT_SID")
 token = os.environ.get("TWILIO_AUTH_TOKEN")
 phone_number = os.environ.get("TWILIO_NUMBER")
+ws_url = os.environ.get("WEBSOCKET_URL")
 twilio_url = "https://api.twilio.com/"
 
 class google_controller:
@@ -138,22 +139,28 @@ class twilio_controller:
         if twilio_controller.twilio_client is None:
             twilio_controller.twilio_client = twilio.rest.Client(username=sid,password=token)
         
-    async def twilio_send_message(to_number: str, body: str) -> bool:
-        result = await twilio_controller.twilio_client.messages.create(to=to_number,from_=phone_number,body=body)
+    async def twilio_send_message(to_number: str, body: str, from_number: str = phone_number) -> bool:
+        result = twilio_controller.twilio_client.messages.create(to=to_number,from_=from_number,body=body)
         #possibly change this to query the URI for status once it has been sent or received
         if result._properties["status"] == "queued":
             return True
         return False
 
-    async def twilio_call_with_recording(from_number: str, to_number: str, msg: str) -> bool:
+    async def twilio_call_with_recording(to_number: str, body: str, from_number: str = phone_number) -> bool:
         twiml = f'''<Response>
             <Say>
-                {msg}
+                {body}
             </Say>
         </Response>'''
-        await twilio_controller.twilio_client.calls.create(to=to_number, from_=from_number, twiml=twiml)
+        
+        try:
+            result = twilio_controller.twilio_client.calls.create(to=to_number, from_=from_number, twiml=twiml)
+        except twilio.base.exceptions.TwilioException as e:
+            print(e)
+            return False
+
+        print(result._properties)
         return True
 
     async def get_call_info(call_sid: str) -> str:
-        from_number = await twilio_controller.twilio_client.calls(call_sid).fetch().from_formatted
-        return from_number
+        return twilio_controller.twilio_client.calls(call_sid).fetch().from_formatted
