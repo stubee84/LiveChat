@@ -1,7 +1,8 @@
 # chat/consumers.py
-import json, re
-from .controllers.main import twilio_controller
-from channels.generic.websocket import AsyncWebsocketConsumer, WebsocketConsumer
+import json, re, base64
+from django.utils.functional import LazyObject
+from .controllers.main import twilio_controller, google_controller
+from channels.generic.websocket import AsyncWebsocketConsumer, WebsocketConsumer, SyncConsumer
 
  #+14074910011 or 14074910011 or 4074910011
 num_reg = re.compile(r'.*:(\d{10}|\d{11}|(\+\d{11})):.*')
@@ -73,15 +74,39 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
 class StreamConsumer(WebsocketConsumer):
     def connect(self):
+        # print(self.channel_name)
+        # self.group_name = "twilio_stream"
+        # self.channel_layer.group_add(
+        #     self.group_name,
+        #     self.channel_name
+        # )
         self.accept()
+        google_controller.start_transcriptions_stream()
 
     def disconnect(self, close_code):
         pass
 
     def receive(self, text_data):
-        print(text_data)
-        # message = text_data_json['message']
+        if text_data is None:
+            google_controller.end_stream()
+            return
 
-        self.send(text_data=json.dumps({
-            'message': text_data
-        }))
+        data = json.loads(text_data)
+        if data['event'] in ("connected", "start"):
+            print(f"Media WS: Received event '{data['event']}': {message}")
+        elif data['event'] == "media":
+            media = data['media']
+            chunk = base64.b64decode(media['payload'])
+            google_controller.add_req_to_queue(chunk)
+        elif data['event'] == "stop":
+            print(f"Media WS: Received event 'stop': {message}")
+            print("Stopping...")
+            google_controller.end_stream()
+        
+        if google_controller.stream_is_finished():
+            return
+        
+    
+    def chat_message(self, event):
+        print(event)
+        self.send(text_data={'message': event['message']})

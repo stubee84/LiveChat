@@ -1,4 +1,4 @@
-import twilio.rest, os, asyncio, requests, json, google.auth
+import twilio.rest, os, asyncio, requests, json, google.auth, threading, queue
 import google.auth.transport.requests as tr_requests
 from dotenv import load_dotenv
 from google.cloud import storage, speech
@@ -16,6 +16,8 @@ twilio_url = "https://api.twilio.com/"
 class google_controller:
     storage_client: storage.Client = None
     speech_client: speech.SpeechClient = None
+    stream_queue: queue.Queue = None
+    stream_finished: bool = False
     transport: tr_requests.AuthorizedSession = None
     bucket_name: str = os.environ.get("GOOGLE_CLOUD_STORAGE_BUCKET_NAME")
     # bucket_name: str = "rare-charmer-214613.appspot.com"
@@ -24,7 +26,7 @@ class google_controller:
 
     def connect(**kwargs):
         '''
-            params: destination - for connection to Google Cloud Storage use `storage`
+            params: destination - for connection to Google Cloud Storage use `storage`, for Google Cloud Speech use `speech`
         '''
         try:
             if kwargs['destination'].lower() == "storage":
@@ -36,6 +38,55 @@ class google_controller:
         except KeyError as e:
             print(e)
             return
+        
+    def start_transcriptions_stream():
+        google_controller.connect(destination="speech")
+        
+        config = speech.RecognitionConfig(
+            encoding=speech.RecognitionConfig.AudioEncoding.MULAW,
+            sample_rate_hertz=8000,
+            language_code="en-US",
+        )
+        streaming_config = speech.StreamingRecognitionConfig(config=config)
+
+        google_controller.stream_queue = queue.Queue()
+        responses = google_controller.speech_client.streaming_recognize(streaming_config, google_controller.get_req_from_queue())
+        google_controller.process_stream(responses)
+
+    def stream_is_finished() -> bool:
+        return google_controller.finished
+    
+    def end_stream():
+        google_controller.stream_finished = True
+
+    def add_req_to_queue(chunk: str):
+        google_controller.stream_queue.put(speech.StreamingRecognizeRequest(audio_content=bytes(chunk)))
+
+    def get_req_from_queue():
+        while not google_controller.stream_is_finished():
+            yield google_controller.stream_queue.get()
+
+    def process_stream(responses: speech.StreamingRecognizeResponse)
+        thread = threading.Thread(target=stream_iterator, args=[responses])
+        thread.start()
+    
+    def stream_iterator(responses: List[speech.StreamingRecognizeResponse]):
+        for response in responses:
+            google_controller.print_transcription_response(response)
+
+            if google_controller.stream_is_finished():
+                break
+    
+    def print_transcription_response(response: speech.StreamingRecognizeResponse):
+        if not response.results:
+            return
+        
+        result = response.results[0]
+        if not result.alternatives:
+            return
+        
+        transcription = result.alternatives[0].transcript
+        print(transcription)
 
     def download_audio_and_upload(recording_sid: str, recording_url: str) -> str:
         chunk_resp: requests.Response = None
@@ -141,7 +192,7 @@ class twilio_controller:
         
     async def twilio_send_message(to_number: str, body: str, from_number: str = phone_number) -> bool:
         result = twilio_controller.twilio_client.messages.create(to=to_number,from_=from_number,body=body)
-        #possibly change this to query the URI for status once it has been sent or received
+        #TODO: possibly change this to query the URI for status once it has been sent or received
         if result._properties["status"] == "queued":
             return True
         return False
