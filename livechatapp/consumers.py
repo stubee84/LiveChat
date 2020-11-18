@@ -1,7 +1,7 @@
 # chat/consumers.py
 import json, re, base64
 from django.utils.functional import LazyObject
-from .controllers.main import twilio_controller, google_controller
+from .controllers.main import twilio_controller, google_controller, speech
 from channels.generic.websocket import AsyncWebsocketConsumer, WebsocketConsumer, SyncConsumer
 
  #+14074910011 or 14074910011 or 4074910011
@@ -72,41 +72,36 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'message': message
         }))
 
-class StreamConsumer(WebsocketConsumer):
-    def connect(self):
-        # print(self.channel_name)
-        # self.group_name = "twilio_stream"
-        # self.channel_layer.group_add(
-        #     self.group_name,
-        #     self.channel_name
-        # )
-        self.accept()
-        google_controller.start_transcriptions_stream()
+class StreamConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        await self.accept()
+        await google_controller.start_transcriptions_stream()
 
-    def disconnect(self, close_code):
+    async def disconnect(self, close_code):
         pass
 
-    def receive(self, text_data):
+    async def receive(self, text_data):
         if text_data is None:
-            google_controller.end_stream()
+            await google_controller.end_stream()
             return
 
         data = json.loads(text_data)
         if data['event'] in ("connected", "start"):
-            print(f"Media WS: Received event '{data['event']}': {message}")
+            print(f"Media WS: Received event '{data['event']}': {text_data}")
         elif data['event'] == "media":
             media = data['media']
             chunk = base64.b64decode(media['payload'])
-            google_controller.add_req_to_queue(chunk)
+
+            await google_controller.add_req_to_queue(chunk)
         elif data['event'] == "stop":
-            print(f"Media WS: Received event 'stop': {message}")
+            print(f"Media WS: Received event 'stop': {text_data}")
             print("Stopping...")
-            google_controller.end_stream()
+            await google_controller.end_stream()
         
-        if google_controller.stream_is_finished():
+        if google_controller.stream_finished:
             return
         
     
-    def chat_message(self, event):
+    async def chat_message(self, event):
         print(event)
         self.send(text_data={'message': event['message']})

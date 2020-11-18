@@ -24,7 +24,7 @@ class google_controller:
     upload_url: str = u'https://www.googleapis.com/upload/storage/v1/b/{bucket}/o?uploadType=resumable'.format(bucket=bucket_name)
     wr_scope: str = u'https://www.googleapis.com/auth/devstorage.read_write'
 
-    def connect(**kwargs):
+    async def connect(**kwargs):
         '''
             params: destination - for connection to Google Cloud Storage use `storage`, for Google Cloud Speech use `speech`
         '''
@@ -39,45 +39,38 @@ class google_controller:
             print(e)
             return
         
-    def start_transcriptions_stream():
-        google_controller.connect(destination="speech")
+    async def start_transcriptions_stream():
+        await google_controller.connect(destination="speech")
         
         config = speech.RecognitionConfig(
             encoding=speech.RecognitionConfig.AudioEncoding.MULAW,
             sample_rate_hertz=8000,
             language_code="en-US",
         )
-        streaming_config = speech.StreamingRecognitionConfig(config=config)
+        streaming_config = speech.StreamingRecognitionConfig(config=config, interim_results=True)
 
         google_controller.stream_queue = queue.Queue()
-        responses = google_controller.speech_client.streaming_recognize(streaming_config, google_controller.get_req_from_queue())
-        google_controller.process_stream(responses)
-
-    def stream_is_finished() -> bool:
-        return google_controller.finished
+        thread = threading.Thread(target=google_controller.send_to_google, args=(streaming_config,))
+        thread.start()
     
-    def end_stream():
+    async def end_stream():
         google_controller.stream_finished = True
 
-    def add_req_to_queue(chunk: str):
+    async def add_req_to_queue(chunk: str):
         google_controller.stream_queue.put(speech.StreamingRecognizeRequest(audio_content=bytes(chunk)))
 
     def get_req_from_queue():
-        while not google_controller.stream_is_finished():
+        while not google_controller.stream_finished:
             yield google_controller.stream_queue.get()
 
-    def process_stream(responses: speech.StreamingRecognizeResponse)
-        thread = threading.Thread(target=stream_iterator, args=[responses])
-        thread.start()
-    
-    def stream_iterator(responses: List[speech.StreamingRecognizeResponse]):
-        for response in responses:
+    #run in its own thread space
+    def send_to_google(streaming_config: speech.StreamingRecognitionConfig):
+        for response in google_controller.speech_client.streaming_recognize(config=streaming_config, requests=google_controller.get_req_from_queue(),):
             google_controller.print_transcription_response(response)
-
-            if google_controller.stream_is_finished():
-                break
-    
-    def print_transcription_response(response: speech.StreamingRecognizeResponse):
+            if google_controller.stream_finished:
+                return
+        
+    def print_transcription_response(response):
         if not response.results:
             return
         
