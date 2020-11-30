@@ -1,8 +1,8 @@
 # chat/consumers.py
 import json, re, base64
 from django.utils.functional import LazyObject
-from .controllers.main import twilio_controller, google_controller, speech
-from channels.generic.websocket import AsyncWebsocketConsumer, WebsocketConsumer, SyncConsumer
+from .controllers.main import twilio_controller, google_transcribe_speech, google_text_to_speech
+from channels.generic.websocket import AsyncWebsocketConsumer
 
  #+14074910011 or 14074910011 or 4074910011
 num_reg = re.compile(r'.*:(\d{10}|\d{11}|(\+\d{11})):.*')
@@ -44,6 +44,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 
                 if method == "text":
                     result = await twilio_controller.twilio_send_message(to_number=to_number,body=message)
+                elif method == "transcribe":
+                    text_to_speech = google_text_to_speech(number=to_number)
+                    await text_to_speech.transcribe_text(text=message)
                 else:
                     result = await twilio_controller.twilio_call_with_recording(to_number=to_number,body=message)
 
@@ -51,8 +54,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     message = "Failed to send message. {}".format(message)
             except IndexError as e:
                 message = "Failed to send message. {}".format(e)
-        else:
-            print("could not match regular expression")
 
         # Send message to room group
         await self.channel_layer.group_send(
@@ -66,42 +67,65 @@ class ChatConsumer(AsyncWebsocketConsumer):
     # Receive message from room group
     async def chat_message(self, event):
         message = event['message']
+        
+        try:
+            stream = event['stream']
+            text = json.dumps({
+                'message': message,
+                'stream': stream
+            })
+        except KeyError:
+            text = json.dumps({
+                'message': message
+            })
 
         # Send message to WebSocket
-        await self.send(text_data=json.dumps({
-            'message': message
-        }))
+        await self.send(text_data=text)
 
 class StreamConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         await self.accept()
-        await google_controller.start_transcriptions_stream()
+        await twilio_controller.connect(destination="twilio")
+        await google_transcribe_speech.start_transcriptions_stream()
 
     async def disconnect(self, close_code):
         pass
 
     async def receive(self, text_data):
         if text_data is None:
-            await google_controller.end_stream()
+            await google_transcribe_speech.end_stream()
             return
 
         data = json.loads(text_data)
-        if data['event'] in ("connected", "start"):
+        if data['event'] == "start":
+            caller = await twilio_controller.get_call_info(call_sid=data["start"]["callSid"])
+            
+            #remove preceding + from E.164 number since channels will not accept that character in the string
+            await self.channel_layer.group_add(
+                caller.from_[2:],
+                self.channel_name
+            )
+            await self.channel_layer.group_send(
+                "chat_lobby",
+                {
+                    'type': 'chat_message',
+                    'message': f'Incoming stream from {caller.from_[2:]}'
+                }
+            )
             print(f"Media WS: Received event '{data['event']}': {text_data}")
         elif data['event'] == "media":
             media = data['media']
             chunk = base64.b64decode(media['payload'])
 
-            await google_controller.add_req_to_queue(chunk)
+            await google_transcribe_speech.add_req_to_queue(chunk)
         elif data['event'] == "stop":
             print(f"Media WS: Received event 'stop': {text_data}")
             print("Stopping...")
-            await google_controller.end_stream()
+            await google_transcribe_speech.end_stream()
         
-        if google_controller.stream_finished:
+        if google_transcribe_speech.stream_finished:
             return
         
-    
     async def chat_message(self, event):
-        print(event)
-        self.send(text_data={'message': event['message']})
+        # print(event)
+        self.send(text_data=event['message'])

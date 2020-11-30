@@ -91,9 +91,9 @@ def record(request: request.HttpRequest):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(main.twilio_controller.connect(destination="twilio"))
-        caller = loop.run_until_complete(main.twilio_controller.get_call_info(call_sid=call_sid))
+        caller = loop.run_until_complete(main.twilio_controller.get_call_info(call_sid=call_sid).from_formatted)
 
-        transcript = main.google_controller.download_audio_and_transcribe(recording_url=request.POST.get("RecordingUrl"))
+        transcript = main.google_transcribe_speech.download_audio_and_transcribe(recording_url=request.POST.get("RecordingUrl"))
         print(transcript)
         channel_layer = channels.layers.get_channel_layer()
         async_to_sync(channel_layer.group_send)("chat_lobby", {
@@ -101,8 +101,8 @@ def record(request: request.HttpRequest):
             "message": f'{caller} - {transcript}'
         })
         
-        # gcs_uri = main.google_controller.download_audio_and_upload(recording_sid=request.POST.get("RecordingSid"), recording_url=request.POST.get("RecordingUrl"))
-        # transcript = main.google_controller.transcribe_audio(gcs_uri=gcs_uri)
+        # gcs_uri = main.google_transcribe_speech.download_audio_and_upload(recording_sid=request.POST.get("RecordingSid"), recording_url=request.POST.get("RecordingUrl"))
+        # transcript = main.google_transcribe_speech.transcribe_audio(gcs_uri=gcs_uri)
         return HttpResponse()
     except KeyError:
         return
