@@ -94,7 +94,6 @@ def record(request: request.HttpRequest):
         caller = loop.run_until_complete(main.twilio_controller.get_call_info(call_sid=call_sid).from_formatted)
 
         transcript = main.google_transcribe_speech.download_audio_and_transcribe(recording_url=request.POST.get("RecordingUrl"))
-        print(transcript)
         channel_layer = channels.layers.get_channel_layer()
         async_to_sync(channel_layer.group_send)("chat_lobby", {
             "type": "chat_message",

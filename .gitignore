@@ -4,6 +4,9 @@ ngrok.exe
 LiveChat/__pycache__/
 LiveChat/.env
 .vscode/
+*.mp3
+*.wav
+*.raw
 livechatapp/__pycache__/
 livechatapp/controllers/__pycache__/
 livechatapp/migrations/

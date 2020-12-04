@@ -44,9 +44,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 
                 if method == "text":
                     result = await twilio_controller.twilio_send_message(to_number=to_number,body=message)
-                elif method == "transcribe":
-                    text_to_speech = google_text_to_speech(number=to_number)
-                    await text_to_speech.transcribe_text(text=message)
                 else:
                     result = await twilio_controller.twilio_call_with_recording(to_number=to_number,body=message)
 
@@ -54,6 +51,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     message = "Failed to send message. {}".format(message)
             except IndexError as e:
                 message = "Failed to send message. {}".format(e)
+        else:
+            text = str(message).split(':')
+            method = text[0]
+            stream_sid = text[1]
+            message = text[len(text)-1].strip()
+
+            text_to_speech = google_text_to_speech()
+            filename = await text_to_speech.transcribe_text(text=message)
+            await text_to_speech.begin_audio_stream(streamSid=stream_sid, filename=filename)
 
         # Send message to room group
         await self.channel_layer.group_send(
@@ -85,7 +91,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 class StreamConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         await self.accept()
-        await twilio_controller.connect(destination="twilio")
+        # await twilio_controller.connect(destination="twilio")
         await google_transcribe_speech.start_transcriptions_stream()
 
     async def disconnect(self, close_code):
@@ -98,26 +104,26 @@ class StreamConsumer(AsyncWebsocketConsumer):
 
         data = json.loads(text_data)
         if data['event'] == "start":
-            caller = await twilio_controller.get_call_info(call_sid=data["start"]["callSid"])
-            
-            #remove preceding + from E.164 number since channels will not accept that character in the string
+            print(f"Media WS: Received event '{data['event']}': {text_data}")
             await self.channel_layer.group_add(
-                caller.from_[2:],
+                data["streamSid"],
                 self.channel_name
             )
+
             await self.channel_layer.group_send(
                 "chat_lobby",
                 {
                     'type': 'chat_message',
-                    'message': f'Incoming stream from {caller.from_[2:]}'
+                    'message': f'Incoming stream from {data["streamSid"]}'
                 }
             )
-            print(f"Media WS: Received event '{data['event']}': {text_data}")
         elif data['event'] == "media":
             media = data['media']
             chunk = base64.b64decode(media['payload'])
 
             await google_transcribe_speech.add_req_to_queue(chunk)
+        elif data['event'] == "mark":
+            print(data)
         elif data['event'] == "stop":
             print(f"Media WS: Received event 'stop': {text_data}")
             print("Stopping...")
@@ -127,5 +133,14 @@ class StreamConsumer(AsyncWebsocketConsumer):
             return
         
     async def chat_message(self, event):
-        # print(event)
-        self.send(text_data=event['message'])
+        await self.send(text_data=event['message'])
+
+        msg = json.loads(event['message'])
+        mark = json.dumps({
+            "event": "mark",
+            "streamSid": msg["streamSid"],
+            "mark": {
+                "name": "message 1"
+            }
+        })
+        await self.send(text_data=mark)

@@ -15,11 +15,11 @@ ws_url = os.environ.get("WEBSOCKET_URL")
 twilio_url = "https://api.twilio.com/"
 
 class google_text_to_speech:
-    def __init__(self, number: str):
-        self.number = from_number
+    def __init__(self):
         self.text_client: texttospeech.TextToSpeechAsyncClient = texttospeech.TextToSpeechAsyncClient()
+        self.channel_layer = channels.layers.get_channel_layer()
     
-    async def transcribe_text(self, text: str):
+    async def transcribe_text(self, text: str) -> str:
         synthesize_input = texttospeech.SynthesisInput(text=text)
         voice = texttospeech.VoiceSelectionParams(
                 language_code="en-US", ssml_gender=texttospeech.SsmlVoiceGender.FEMALE
@@ -34,29 +34,31 @@ class google_text_to_speech:
         # new_frames = audioop.bias(new_frames, 1, 128)
         # converted_response = audioop.lin2ulaw(new_frames, 1)
 
-        with open(file="chat.mp3", mode="wb") as out:
-            out.write(response.audio_content)
+        # with open(file="chat.mp3", mode="wb") as out:
+        #     out.write(response.audio_content)
         
-        stream = ffmpeg.input(filename="chat.mp3")
-        stream = ffmpeg.output(stream, 'mulaw.wav', format='wav', acodec='pcm_mulaw', ac=1, ar='8k')
+        stream = ffmpeg.input(response.audio_content)
+        stream = ffmpeg.output(stream, 'mulaw.raw', format='mulaw', acodec='pcm_mulaw', ac=1, ar='8k')
         stream = ffmpeg.overwrite_output(stream)
         ffmpeg.run(stream)
+
+        return "mulaw.raw"
 
     async def begin_audio_stream(self, streamSid: str, filename: str):
         fileio = io.open(file=filename, mode='rb', buffering=-1, encoding=None, errors=None, newline=None, closefd=True)
         
-        while fileio.readable():
-            msg = {
-                "event": "media",
-                "streamSid": streamSid,
-                "media": {
-                    "payload": base64.b64encode(fileio.read()),
-                }
+        filebytes = fileio.read()
+        msg = {
+            "event": "media",
+            "streamSid": streamSid,
+            "media": {
+                "payload": base64.b64encode(filebytes).decode("ascii"),
             }
-            await channel_layer.group_send(self.number, {
-                "type": "chat_message",
-                "message": json.dumps(msg)
-            }) 
+        }
+        await self.channel_layer.group_send(streamSid, {
+            "type": "chat_message",
+            "message": json.dumps(msg)
+        }) 
                         
         fileio.close()
 
