@@ -19,7 +19,7 @@ class google_text_to_speech:
         self.text_client: texttospeech.TextToSpeechAsyncClient = texttospeech.TextToSpeechAsyncClient()
         self.channel_layer = channels.layers.get_channel_layer()
     
-    async def transcribe_text(self, text: str) -> str:
+    async def transcribe_text(self, text: str) -> bytes:
         synthesize_input = texttospeech.SynthesisInput(text=text)
         voice = texttospeech.VoiceSelectionParams(
                 language_code="en-US", ssml_gender=texttospeech.SsmlVoiceGender.FEMALE
@@ -30,37 +30,34 @@ class google_text_to_speech:
 
         response = await self.text_client.synthesize_speech(input=synthesize_input, voice=voice, audio_config=audio_config)
 
-        # new_frames = audioop.lin2lin(response.audio_content, 2, 1)
-        # new_frames = audioop.bias(new_frames, 1, 128)
-        # converted_response = audioop.lin2ulaw(new_frames, 1)
+        try:
+            process = (
+                ffmpeg
+                .input('pipe:', format='mp3', acodec='mp3')
+                .output('pipe:', format='mulaw', acodec='pcm_mulaw', ac=1, ar='8k')
+                .run_async(pipe_stdin=True, pipe_stdout=True)
+            )
 
-        # with open(file="chat.mp3", mode="wb") as out:
-        #     out.write(response.audio_content)
-        
-        stream = ffmpeg.input(response.audio_content)
-        stream = ffmpeg.output(stream, 'mulaw.raw', format='mulaw', acodec='pcm_mulaw', ac=1, ar='8k')
-        stream = ffmpeg.overwrite_output(stream)
-        ffmpeg.run(stream)
+            out, err = process.communicate(input=response.audio_content)
+        except ffmpeg.Error as e:
+            print(e.stderr, file=sys.stderr)
+            return bytes(0)
 
-        return "mulaw.raw"
+        return out
 
-    async def begin_audio_stream(self, streamSid: str, filename: str):
-        fileio = io.open(file=filename, mode='rb', buffering=-1, encoding=None, errors=None, newline=None, closefd=True)
-        
-        filebytes = fileio.read()
+    async def begin_audio_stream(self, streamSid: str, in_bytes: bytes):
         msg = {
             "event": "media",
             "streamSid": streamSid,
             "media": {
-                "payload": base64.b64encode(filebytes).decode("ascii"),
+                "payload": base64.b64encode(in_bytes).decode("ascii"),
             }
         }
+
         await self.channel_layer.group_send(streamSid, {
             "type": "chat_message",
             "message": json.dumps(msg)
         }) 
-                        
-        fileio.close()
 
 
 class google_transcribe_speech:

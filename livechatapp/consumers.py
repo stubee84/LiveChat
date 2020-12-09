@@ -1,10 +1,9 @@
 # chat/consumers.py
-import json, re, base64
+import json, re, base64, sys
 from django.utils.functional import LazyObject
 from .controllers.main import twilio_controller, google_transcribe_speech, google_text_to_speech
 from channels.generic.websocket import AsyncWebsocketConsumer
 
- #+14074910011 or 14074910011 or 4074910011
 num_reg = re.compile(r'.*:(\d{10}|\d{11}|(\+\d{11})):.*')
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -58,8 +57,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             message = text[len(text)-1].strip()
 
             text_to_speech = google_text_to_speech()
-            filename = await text_to_speech.transcribe_text(text=message)
-            await text_to_speech.begin_audio_stream(streamSid=stream_sid, filename=filename)
+            out_bytes = await text_to_speech.transcribe_text(text=message)
+
+            #implement some error handling here
+            if sys.getsizeof(out_bytes) != 0:
+                await text_to_speech.begin_audio_stream(streamSid=stream_sid, in_bytes=out_bytes)
 
         # Send message to room group
         await self.channel_layer.group_send(
@@ -91,7 +93,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
 class StreamConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         await self.accept()
-        # await twilio_controller.connect(destination="twilio")
         await google_transcribe_speech.start_transcriptions_stream()
 
     async def disconnect(self, close_code):
