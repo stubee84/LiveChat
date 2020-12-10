@@ -39,12 +39,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 method = text[0]
                 message = text[len(text)-1].strip()
             
-                await twilio_controller.connect(destination="Twilio")
+                tc = twilio_controller()
+                await tc.connect(destination="Twilio")
                 
                 if method == "text":
-                    result = await twilio_controller.twilio_send_message(to_number=to_number,body=message)
+                    result = await tc.twilio_send_message(to_number=to_number,body=message)
                 else:
-                    result = await twilio_controller.twilio_call_with_recording(to_number=to_number,body=message)
+                    result = await tc.twilio_call_with_recording(to_number=to_number,body=message)
 
                 if result == False:
                     message = "Failed to send message. {}".format(message)
@@ -93,14 +94,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
 class StreamConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         await self.accept()
-        await google_transcribe_speech.start_transcriptions_stream()
+        self.transcribe_speech = google_transcribe_speech()
+        await transcribe_speech.start_transcriptions_stream()
 
     async def disconnect(self, close_code):
         pass
 
     async def receive(self, text_data):
         if text_data is None:
-            await google_transcribe_speech.end_stream()
+            await self.transcribe_speech.end_stream()
             return
 
         data = json.loads(text_data)
@@ -122,15 +124,15 @@ class StreamConsumer(AsyncWebsocketConsumer):
             media = data['media']
             chunk = base64.b64decode(media['payload'])
 
-            await google_transcribe_speech.add_req_to_queue(chunk)
+            await self.transcribe_speech.add_req_to_queue(chunk)
         elif data['event'] == "mark":
             print(data)
         elif data['event'] == "stop":
             print(f"Media WS: Received event 'stop': {text_data}")
             print("Stopping...")
-            await google_transcribe_speech.end_stream()
+            await self.transcribe_speech.end_stream()
         
-        if google_transcribe_speech.stream_finished:
+        if self.transcribe_speech.stream_finished:
             return
         
     async def chat_message(self, event):

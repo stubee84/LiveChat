@@ -61,33 +61,33 @@ class google_text_to_speech:
 
 
 class google_transcribe_speech:
-    storage_client: storage.Client = None
-    speech_client: speech.SpeechClient = None
-    stream_queue: queue.Queue = None
-    stream_finished: bool = False
-    transport: tr_requests.AuthorizedSession = None
-    bucket_name: str = os.environ.get("GOOGLE_CLOUD_STORAGE_BUCKET_NAME")
-    # bucket_name: str = "rare-charmer-214613.appspot.com"
-    upload_url: str = u'https://www.googleapis.com/upload/storage/v1/b/{bucket}/o?uploadType=resumable'.format(bucket=bucket_name)
-    wr_scope: str = u'https://www.googleapis.com/auth/devstorage.read_write'
+    def __init__(self):
+        self.storage_client: storage.Client = None
+        self.speech_client: speech.SpeechClient = None
+        self.stream_queue: queue.Queue = None
+        self.stream_finished: bool = False
+        self.transport: tr_requests.AuthorizedSession = None
+        self.bucket_name: str = os.environ.get("GOOGLE_CLOUD_STORAGE_BUCKET_NAME")
+        self.upload_url: str = u'https://www.googleapis.com/upload/storage/v1/b/{bucket}/o?uploadType=resumable'.format(bucket=bucket_name)
+        self.wr_scope: str = u'https://www.googleapis.com/auth/devstorage.read_write'
 
-    async def connect(**kwargs):
+    async def connect(self, **kwargs):
         '''
             params: destination - for connection to Google Cloud Storage use `storage`, for Google Cloud Speech use `speech`
         '''
         try:
             if kwargs['destination'].lower() == "storage":
-                google_transcribe_speech.storage_client = storage.Client()
-                credentials, _ = google.auth.default(scopes=(google_transcribe_speech.wr_scope,))
-                google_transcribe_speech.transport = tr_requests.AuthorizedSession(credentials)
+                self.storage_client = storage.Client()
+                credentials, _ = google.auth.default(scopes=(self.wr_scope,))
+                self.transport = tr_requests.AuthorizedSession(credentials)
             elif kwargs['destination'].lower() == "speech":
-                google_transcribe_speech.speech_client = speech.SpeechClient()
+                self.speech_client = speech.SpeechClient()
         except KeyError as e:
             print(e)
             return
         
-    async def start_transcriptions_stream():
-        await google_transcribe_speech.connect(destination="speech")
+    async def start_transcriptions_stream(self):
+        await self.connect(destination="speech")
         
         config = speech.RecognitionConfig(
             encoding=speech.RecognitionConfig.AudioEncoding.MULAW,
@@ -96,32 +96,32 @@ class google_transcribe_speech:
         )
         streaming_config = speech.StreamingRecognitionConfig(config=config, interim_results=True)
 
-        google_transcribe_speech.stream_queue = queue.Queue()
-        thread = threading.Thread(target=google_transcribe_speech.send_to_google, args=(streaming_config,))
+        self.stream_queue = queue.Queue()
+        thread = threading.Thread(target=self.send_to_google, args=(streaming_config,))
         thread.start()
     
-    async def end_stream():
-        google_transcribe_speech.stream_finished = True
+    async def end_stream(self):
+        self.stream_finished = True
 
     #method to add audio chunk to queue
-    async def add_req_to_queue(chunk: str):
-        google_transcribe_speech.stream_queue.put(speech.StreamingRecognizeRequest(audio_content=bytes(chunk)))
+    async def add_req_to_queue(self, chunk: str):
+        self.stream_queue.put(speech.StreamingRecognizeRequest(audio_content=bytes(chunk)))
 
     #generator to get chunk of data from queue
-    def get_req_from_queue():
-        while not google_transcribe_speech.stream_finished:
-            yield google_transcribe_speech.stream_queue.get()
+    def get_req_from_queue(self):
+        while not self.stream_finished:
+            yield self.stream_queue.get()
 
     #run in its own thread space
-    def send_to_google(streaming_config: speech.StreamingRecognitionConfig):
+    def send_to_google(self, streaming_config: speech.StreamingRecognitionConfig):
         channel_layer = channels.layers.get_channel_layer()
         #start the streaming recognition and block, using the queue, until data becomes available
-        for response in google_transcribe_speech.speech_client.streaming_recognize(config=streaming_config, requests=google_transcribe_speech.get_req_from_queue(),):
-            google_transcribe_speech.print_transcription_response(response, channel_layer)
-            if google_transcribe_speech.stream_finished:
+        for response in self.speech_client.streaming_recognize(config=streaming_config, requests=self.get_req_from_queue(),):
+            self.print_transcription_response(response, channel_layer)
+            if self.stream_finished:
                 return
         
-    def print_transcription_response(response, channel_layer):
+    def print_transcription_response(self, response, channel_layer):
         if not response.results:
             return
         
@@ -136,7 +136,7 @@ class google_transcribe_speech:
             "message": f'{transcription}'
         })
 
-    def download_audio_and_upload(recording_sid: str, recording_url: str) -> str:
+    def download_audio_and_upload(self, recording_sid: str, recording_url: str) -> str:
         chunk_resp: requests.Response = None
         response = requests.get(url=recording_url, stream=True)
         # filename = f"{recording_sid}.wav"
@@ -144,26 +144,26 @@ class google_transcribe_speech:
         # #metadata name key is the blob_name to upload to
         metadata = {u'name': recording_sid}
 
-        google_transcribe_speech.connect(destination="storage")
+        self.connect(destination="storage")
         #chunk must be divisible by 256.0
-        upload = ResumableUpload(google_transcribe_speech.upload_url, 1024 * 256)
+        upload = ResumableUpload(self.upload_url, 1024 * 256)
         #the response.raw is the raw bytes from http response. it is only useable if you provide stream=True in the request
-        gc_resp = upload.initiate(google_transcribe_speech.transport, response.raw, metadata, content_type, stream_final=False)
+        gc_resp = upload.initiate(self.transport, response.raw, metadata, content_type, stream_final=False)
 
         if gc_resp.status_code == 200:
             while not upload.finished:
-                chunk_resp = upload.transmit_next_chunk(google_transcribe_speech.transport)
+                chunk_resp = upload.transmit_next_chunk(self.transport)
         else:
             print(resp.status_code)
 
-        return 'gs://{bucket_name}/{blob_name}'.format(google_transcribe_speech.bucket_name, recording_sid)
+        return 'gs://{bucket_name}/{blob_name}'.format(self.bucket_name, recording_sid)
 
-    def transcribe_audio(gcs_uri: str) -> str:
-        google_transcribe_speech.connect(destination="speech")
+    def transcribe_audio(self, gcs_uri: str) -> str:
+        self.connect(destination="speech")
         audio = speech.RecognitionAudio(uri=gcs_uri)
         config = speech.RecognitionConfig(encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,sample_rate_hertz=8000,language_code="en-US")
 
-        operation = google_transcribe_speech.speech_client.long_running_recognize(request={"config":config,"audio":audio})
+        operation = self.speech_client.long_running_recognize(request={"config":config,"audio":audio})
 
         print("Waiting for operation to complete")
         response = operation.result(timeout=90)
@@ -174,9 +174,9 @@ class google_transcribe_speech:
         
         return transcript
 
-    def download_audio_and_transcribe(recording_url: str) -> str:
+    def download_audio_and_transcribe(self, recording_url: str) -> str:
         transcription: str = ""
-        google_transcribe_speech.connect(destination="speech")
+        self.connect(destination="speech")
         response = requests.get(url=recording_url, stream=True)
 
         reqs = (speech.StreamingRecognizeRequest(audio_content=chunk) for chunk in response.iter_content())
@@ -187,7 +187,7 @@ class google_transcribe_speech:
         )
         streaming_config = speech.StreamingRecognitionConfig(config=config)
 
-        responses = google_transcribe_speech.speech_client.streaming_recognize(config=streaming_config, requests=reqs,)
+        responses = self.speech_client.streaming_recognize(config=streaming_config, requests=reqs,)
 
         for response in responses:
             # Once the transcription has settled, the first result will contain the
@@ -205,29 +205,30 @@ class google_transcribe_speech:
         return transcription
 
 class twilio_controller:
+    def __init__(self):
     #Rest client variable. Maybe call this rest_clients
-    twilio_client: twilio.rest.Client = None
+        self.twilio_client: twilio.rest.Client = None
     
-    async def connect(**kwargs):
+    async def connect(self, **kwargs):
         try:
             if kwargs['destination'].lower() == "twilio":
-                await twilio_controller.twilio_connect(sid=sid,token=token)
+                await self.twilio_connect(sid=sid,token=token)
         except KeyError:
             return
 
     #Maybe: put these two functitons into their own twilio child class
-    async def twilio_connect(sid: str, token: str):
-        if twilio_controller.twilio_client is None:
-            twilio_controller.twilio_client = twilio.rest.Client(username=sid,password=token)
+    async def twilio_connect(self, sid: str, token: str):
+        if self.twilio_client is None:
+            self.twilio_client = twilio.rest.Client(username=sid,password=token)
         
-    async def twilio_send_message(to_number: str, body: str, from_number: str = phone_number) -> bool:
-        result = twilio_controller.twilio_client.messages.create(to=to_number,from_=from_number,body=body)
+    async def twilio_send_message(self, to_number: str, body: str, from_number: str = phone_number) -> bool:
+        result = self.twilio_client.messages.create(to=to_number,from_=from_number,body=body)
         #TODO: possibly change this to query the URI for status once it has been sent or received
         if result._properties["status"] == "queued":
             return True
         return False
 
-    async def twilio_call_with_recording(to_number: str, body: str, from_number: str = phone_number) -> bool:
+    async def twilio_call_with_recording(self, to_number: str, body: str, from_number: str = phone_number) -> bool:
         twiml = f'''<Response>
             <Say>
                 {body}
@@ -235,7 +236,7 @@ class twilio_controller:
         </Response>'''
         
         try:
-            result = twilio_controller.twilio_client.calls.create(to=to_number, from_=from_number, twiml=twiml)
+            result = self.twilio_client.calls.create(to=to_number, from_=from_number, twiml=twiml)
         except twilio.base.exceptions.TwilioException as e:
             print(e)
             return False
@@ -243,5 +244,5 @@ class twilio_controller:
         print(result._properties)
         return True
 
-    async def get_call_info(call_sid: str) -> str:
-        return twilio_controller.twilio_client.calls(call_sid).fetch()
+    async def get_call_info(self, call_sid: str) -> str:
+        return self.twilio_client.calls(call_sid).fetch()
