@@ -1,6 +1,12 @@
 from djongo import models
 
-# Create your models here.
+class User(models.Model):
+    _id = models.ObjectIdField()
+    email = models.CharField(max_length=30, unique=True)
+    password = models.CharField(max_length=30)
+    temporary = models.BooleanField(default=False, null=False)
+    session_token = models.CharField(max_length=100)
+
 class Caller(models.Model):
     _id = models.ObjectIdField()
     number = models.IntegerField(unique=True)

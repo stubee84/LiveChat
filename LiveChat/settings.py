@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/3.1/ref/settings/
 
 from pathlib import Path
 from dotenv import load_dotenv
+import django
 import os
 
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -32,11 +33,12 @@ DEBUG = True
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS').split(':')
 
-
 # Application definition
 
 INSTALLED_APPS = [
     'channels',
+    'rest_framework',
+    'corsheaders',
     'livechatapp',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -54,7 +56,10 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
 ]
+
+AUTHENTICATION_BACKENDS = ['django.contrib.auth.backends.ModelBackend']
 
 ROOT_URLCONF = 'LiveChat.urls'
 
@@ -145,3 +150,10 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny'
+    ]
+}
+CORS_ORIGIN_ALLOW_ALL = True
