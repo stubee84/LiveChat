@@ -1,9 +1,9 @@
-from django.shortcuts import render
 import json, websocket, asyncio, channels.layers, django.http.request as request
+from .models import *
+from django.shortcuts import render
 from asgiref.sync import async_to_sync
 from .consumers import ChatConsumer
 from .controllers import main
-import models
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from twilio.twiml.voice_response import VoiceResponse, Connect, Stream
@@ -26,9 +26,9 @@ def sms(request: request.HttpRequest):
         message = {"message":from_number + ': ' + text[1].strip(' ')}
 
         from_number = int(str(from_number).strip('+'))
-        caller = models.Caller.objects.get(number=from_number)
+        caller = Caller.objects.get(number=from_number)
         if caller is None:
-            caller = models.Caller.objects.create(
+            caller = Caller.objects.create(
             number=from_number, 
             country=request.POST.get("FromCountry"),
             city=request.POST.get("FromCity"),
