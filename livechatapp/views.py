@@ -1,5 +1,7 @@
 import json, websocket, asyncio, channels.layers, django.http.request as request
+from rest_framework import response, status, views
 from .models import *
+from .serializers import *
 from django.shortcuts import render
 from asgiref.sync import async_to_sync
 from .consumers import ChatConsumer
@@ -8,6 +10,16 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from twilio.twiml.voice_response import VoiceResponse, Connect, Stream
 from twilio.request_validator import RequestValidator
+
+class UserRegistration(views.APIView):
+    def post(self, request: request.HttpRequest, format='json') -> response.Response:
+        serializer = UserSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            user = serializer.create(validated_data=request.data)
+            if user:
+                return response.Response(data=serializer.data, status=status.HTTP_201_CREATED)
+        return response.Response(status=status.HTTP_400_BAD_REQUEST)
 
 # Create your views here.
 def index(request: request.HttpRequest):

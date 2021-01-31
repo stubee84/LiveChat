@@ -1,22 +1,28 @@
-import models
+from . import models
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
 
 class UserSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(required=True, validators=[UniqueValidator(queryset=models.User.objects.all())])
+    password = serializers.CharField(min_length=8, write_only=True)
+
+    def create(self, validated_data: dict):
+        return models.User.objects.create(email=validated_data['email'], password=validated_data['password'])
     class Meta:
-        models = models.User
-        fields = ['_id','email','password','temporary','session_token']
+        model = models.User
+        fields = ['email','password','temporary','session_token']
 
 class CallSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Call
-        fields = ['_id','sid','length_of_call','caller_id']
+        fields = ['sid','length_of_call','caller_id']
 
 class CallerSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Caller
-        fields = ['_id','number','country','city','state']
+        fields = ['number','country','city','state']
 
 class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Message
-        fields = ['_id','call_id','message_type','message']
+        fields = ['call_id','message_type','message']

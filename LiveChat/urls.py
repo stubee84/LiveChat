@@ -15,9 +15,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from django.conf.urls import include
+from django.conf.urls import include, url
+from django.views.generic import TemplateView
 
 urlpatterns = [
-    path('chat/', include('livechatapp.urls')),
+    path('', include('frontend.urls')),
+    path('api/', include('livechatapp.urls')),
     path('admin/', admin.site.urls),
 ]
