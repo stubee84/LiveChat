@@ -1,14 +1,14 @@
 from django.shortcuts import render
-from rest_framework import generics
-
-def index(request):
-    return render(request, 'frontend/index.html')
-
+from rest_framework import generics, request
+from django.http.request import HttpRequest
 
 class Login(generics.CreateAPIView):
-    def get(request):
-        return render(request, 'frontend/login.html')
+    def get(request: HttpRequest , drf: request.Request):
+        return render(drf, 'frontend/login.html')
+
+    def post(request: HttpRequest, drf: request.Request):
+        pass
 
 class Register(generics.GenericAPIView):
-    def get(request):
-        return render(request, 'frontend/register.html')
+    def get(request: HttpRequest, drf: request.Request):
+        return render(drf, 'frontend/register.html')

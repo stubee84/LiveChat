@@ -69,8 +69,8 @@ WEBPACK_LOADER = {
 }
 
 AUTHENTICATION_BACKENDS = [
-    'django.contrib.auth.backends.ModelBackend',
     'livechatapp.customization.auth.CustomAuth',
+    'django.contrib.auth.backends.ModelBackend'
 ]
 
 ROOT_URLCONF = 'LiveChat.urls'
@@ -90,6 +90,8 @@ TEMPLATES = [
         },
     },
 ]
+
+
 
 WSGI_APPLICATION = 'LiveChat.wsgi.application'
 

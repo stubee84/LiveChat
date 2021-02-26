@@ -1,4 +1,5 @@
 from . import models
+from .controllers.main import password_management
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
@@ -7,7 +8,7 @@ class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(min_length=8, write_only=True)
 
     def create(self, validated_data: dict):
-        return models.User.objects.create(email=validated_data['email'], password=validated_data['password'])
+        return models.User.objects.create(email=validated_data['email'], password=password_management.hash(password=validated_data['password']))
     class Meta:
         model = models.User
         fields = ['email','password','temporary','session_token']

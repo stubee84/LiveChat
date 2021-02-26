@@ -1,4 +1,4 @@
-import twilio.rest, os, asyncio, requests, json, google.auth, threading, queue, channels.layers, io, ffmpeg, base64
+import twilio.rest, os, asyncio, requests, json, google.auth, threading, queue, channels.layers, io, ffmpeg, base64, hashlib
 import google.auth.transport.requests as tr_requests
 from asgiref.sync import async_to_sync
 from dotenv import load_dotenv
@@ -246,3 +246,14 @@ class twilio_controller:
 
     async def get_call_info(self, call_sid: str) -> str:
         return self.twilio_client.calls(call_sid).fetch()
+
+class password_management:
+    def hash(password: str) -> str:
+        hashed_pwd = hashlib.md5(password.encode())
+        return hashed_pwd.hexdigest()
+    
+    def validate_complexity(password: str) -> bool:
+        pass
+    
+    def verify(pwd1: str, pwd2: str) -> bool:
+        pass

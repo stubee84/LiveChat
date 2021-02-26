@@ -6,17 +6,18 @@ from django.shortcuts import render
 from asgiref.sync import async_to_sync
 from .consumers import ChatConsumer
 from .controllers import main
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from django.http import HttpResponse
 from twilio.twiml.voice_response import VoiceResponse, Connect, Stream
 from twilio.request_validator import RequestValidator
 
 class UserRegistration(views.APIView):
+    # @csrf_protect
     def post(self, request: request.HttpRequest, format='json') -> response.Response:
         serializer = UserSerializer(data=request.data)
         
         if serializer.is_valid():
-            user = serializer.create(validated_data=request.data)
+            user: User = serializer.create(validated_data=request.data)
             if user:
                 return response.Response(data=serializer.data, status=status.HTTP_201_CREATED)
         return response.Response(status=status.HTTP_400_BAD_REQUEST)
