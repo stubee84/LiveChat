@@ -2,6 +2,7 @@ from djongo import models
 
 class User(models.Model):
     id = models.ObjectIdField()
+    active = models.BooleanField(default=True, null=False)
     email = models.CharField(max_length=30, unique=True, null=False, blank=False)
     password = models.CharField(max_length=30, null=False, blank=False)
     temporary = models.BooleanField(default=False, null=False)

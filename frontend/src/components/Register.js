@@ -17,20 +17,22 @@ class Register extends Component {
   }
 
   checkPassword() {
-    if (this.password1 !== this.password2) {
+    if (this.state.password1 !== this.state.password2) {
       return false;
     }
+
     return true;
   }
 
   onSubmit = e => {
+    e.preventDefault();
+
     if (!this.checkPassword()) {
-      e.preventDefault();
       alert("password fields do not match");
       this.setState({email: "", password1: "", password2: ""});
       return
     }
-
+    
     fetch("/api/register/", {
       method: "POST",
       headers:  {
@@ -41,17 +43,20 @@ class Register extends Component {
       body: JSON.stringify({email: this.state.email, password: this.state.password1})
     }).then(async response => {
       var data = await response.json();
-
+      
       if (!response.ok) {
         var err = (data && data.message) || response.status;
+        console.error(err);
         return Promise.reject(err);
       }
-    }).catch(error => {
-      alert(error);
-    });
 
-    this.setState({email: "", password1: "", password2: ""})
-    window.location.href = "/login"
+      this.setState({email: "", password1: "", password2: ""})
+      window.location.href = "/login"
+    }).catch(error => {
+      console.error(error);
+      this.setState({email: "", password1: "", password2: ""})
+      return Promise.reject(error)
+    });
   }
 
   render() {

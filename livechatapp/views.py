@@ -1,5 +1,5 @@
 import json, websocket, asyncio, channels.layers, django.http.request as request
-from rest_framework import response, status, views
+from rest_framework import response, status, views, generics
 from .models import *
 from .serializers import *
 from django.shortcuts import render
@@ -12,15 +12,30 @@ from twilio.twiml.voice_response import VoiceResponse, Connect, Stream
 from twilio.request_validator import RequestValidator
 
 class UserRegistration(views.APIView):
-    # @csrf_protect
     def post(self, request: request.HttpRequest, format='json') -> response.Response:
-        serializer = UserSerializer(data=request.data)
+        serializer = RegistrationSerializer(data=request.data)
         
         if serializer.is_valid():
             user: User = serializer.create(validated_data=request.data)
             if user:
                 return response.Response(data=serializer.data, status=status.HTTP_201_CREATED)
         return response.Response(status=status.HTTP_400_BAD_REQUEST)
+
+class UserLogin(generics.CreateAPIView):
+    serializer_class = LoginSerializer
+
+    def post(self, request: request.HttpRequest, format='json') -> response.Response:
+        serializer = self.get_serializer(data=request.data)
+        
+        try:
+            serializer.is_valid(raise_exception=True)
+            user = serializer.validated_data
+            return response.Response(data={
+                "user": UserSerializer(user, context=self.get_serializer_context()).data
+            }, status=status.HTTP_201_CREATED)
+        except BaseException as err:
+            print(f'error: {err}')
+            return response.Response(status=status.HTTP_400_BAD_REQUEST)
 
 # Create your views here.
 def index(request: request.HttpRequest):

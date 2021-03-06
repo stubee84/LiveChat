@@ -4,6 +4,7 @@ from asgiref.sync import async_to_sync
 from dotenv import load_dotenv
 from google.cloud import storage, speech, texttospeech
 from google.resumable_media.requests import ResumableUpload
+from django.contrib.auth.hashers import PBKDF2PasswordHasher
 
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(dotenv_path=dotenv_path)
@@ -13,6 +14,7 @@ token = os.environ.get("TWILIO_AUTH_TOKEN")
 phone_number = os.environ.get("TWILIO_NUMBER")
 ws_url = os.environ.get("WEBSOCKET_URL")
 twilio_url = "https://api.twilio.com/"
+salt = os.environ.get("SALT")
 
 class google_text_to_speech:
     def __init__(self):
@@ -247,13 +249,18 @@ class twilio_controller:
     async def get_call_info(self, call_sid: str) -> str:
         return self.twilio_client.calls(call_sid).fetch()
 
-class password_management:
-    def hash(password: str) -> str:
-        hashed_pwd = hashlib.md5(password.encode())
-        return hashed_pwd.hexdigest()
+class password_management():
+    def __init__(self, password: str):
+        if self.validate_complexity(password):
+            self.password = password
+            self.salt = salt
+
+    def hash(self) -> str:
+        hasher = PBKDF2PasswordHasher()
+        return hasher.encode(password=self.password, salt=self.salt)
     
-    def validate_complexity(password: str) -> bool:
-        pass
+    def validate_complexity(self, password: str) -> bool:
+        return True
     
     def verify(pwd1: str, pwd2: str) -> bool:
         pass
