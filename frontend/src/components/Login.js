@@ -18,7 +18,7 @@ class Login extends Component {
 
   render() {
     return (
-      <form onSubmit={this.onSubmit}>
+      <form onSubmit={this.onSubmit} action="/api/login/" method="post">
         <fieldset>
           <legend>Login</legend>
           <p>
@@ -39,6 +39,7 @@ class Login extends Component {
           <p>
             Don't have an account? <Link to="/register">Register</Link>
           </p>
+          <input type="hidden" id="csrfmiddlewaretoken" value=""/>
         </fieldset>
       </form>
     )
