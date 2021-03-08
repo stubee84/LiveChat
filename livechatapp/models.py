@@ -6,6 +6,7 @@ class User(models.Model):
     email = models.CharField(max_length=30, unique=True, null=False, blank=False)
     password = models.CharField(max_length=30, null=False, blank=False)
     temporary = models.BooleanField(default=False, null=False)
+    last_login = models.DateTimeField(max_lenght=30, null=False)
     session_token = models.CharField(max_length=100, null=True)
 
 class Caller(models.Model):

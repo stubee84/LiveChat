@@ -7,6 +7,7 @@ from asgiref.sync import async_to_sync
 from .consumers import ChatConsumer
 from .controllers import main
 from django.views.decorators.csrf import csrf_exempt, csrf_protect
+from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from twilio.twiml.voice_response import VoiceResponse, Connect, Stream
 from twilio.request_validator import RequestValidator
@@ -25,19 +26,24 @@ class UserLogin(generics.CreateAPIView):
     serializer_class = LoginSerializer
 
     def post(self, request: request.HttpRequest, format='json') -> response.Response:
-        serializer = self.get_serializer(data=request.data)
-        
+        serializer: LoginSerializer = self.get_serializer(data=request.data)
+
         try:
             serializer.is_valid(raise_exception=True)
             user = serializer.validated_data
-            return response.Response(data={
-                "user": UserSerializer(user, context=self.get_serializer_context()).data
-            }, status=status.HTTP_201_CREATED)
+
+            if user is not None:
+                login(request=request, user=user)
+                return response.Response(data={
+                    "user": UserSerializer(user, context=self.get_serializer_context()).data
+                    }, status=status.HTTP_201_CREATED)
+            else:
+                print(f'failed to login user: {user}')
         except BaseException as err:
             print(f'error: {err}')
             return response.Response(status=status.HTTP_400_BAD_REQUEST)
 
-# Create your views here.
+@login_required
 def index(request: request.HttpRequest):
     return render(request, 'index.html')
 
@@ -159,6 +165,7 @@ def hangup(request: request.HttpRequest):
     except KeyError:
         return
 
+@login_required
 def room(request: request.HttpRequest, room_name):
     return render(request, 'room.html', {
         'room_name': room_name

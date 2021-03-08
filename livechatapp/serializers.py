@@ -1,5 +1,5 @@
 # from django.db.models import Q
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, login
 from . import models
 from .controllers.main import password_management
 from rest_framework import serializers
@@ -30,7 +30,6 @@ class LoginSerializer(serializers.Serializer):
         if user and user.active:
             return user
         raise serializers.ValidationError("could not validate provided credentials")
-        # return models.User.objects.get(Q(email=data['email']),Q(password=password_management.hash(data['password'])))
 
 class CallSerializer(serializers.ModelSerializer):
     class Meta:

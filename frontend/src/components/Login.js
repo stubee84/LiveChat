@@ -13,12 +13,16 @@ class Login extends Component {
 
   onSubmit = e => {
     e.preventDefault();
-    console.error("Not implemented!!");
+  }
+
+  componentDidMount = e => {
+    document.getElementById('csrfmiddlewaretoken').value = getCookie("csrftoken");
   }
 
   render() {
     return (
       <form onSubmit={this.onSubmit} action="/api/login/" method="post">
+        <input type="hidden" id="csrfmiddlewaretoken" name="csrfmiddlewaretoken"/>
         <fieldset>
           <legend>Login</legend>
           <p>
@@ -39,7 +43,6 @@ class Login extends Component {
           <p>
             Don't have an account? <Link to="/register">Register</Link>
           </p>
-          <input type="hidden" id="csrfmiddlewaretoken" value=""/>
         </fieldset>
       </form>
     )

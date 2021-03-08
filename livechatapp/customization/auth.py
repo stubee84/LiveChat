@@ -4,7 +4,7 @@ from django.contrib.auth.hashers import check_password
 from ..models import User
 
 class CustomAuth(BaseBackend):
-    def authenticate(self, request: request.HttpRequest = None, username: str = None, password: str = None):
+    def authenticate(self, request: request.HttpRequest = None, username: str = None, password: str = None) -> User:
         try:
             login: User = self.get_user(email=username)
         except User.DoesNotExist:
@@ -16,11 +16,6 @@ class CustomAuth(BaseBackend):
 
         return None
     
-    def get_user_by_id(self, user_id):
-        try:
-            return User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            return None
     def get_user(self, email: str):
         try:
             return User.objects.get(email=email)
