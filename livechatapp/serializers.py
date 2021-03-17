@@ -27,7 +27,7 @@ class LoginSerializer(serializers.Serializer):
 
     def validate(self, data: dict):
         user: models.User = authenticate(username=data['email'], password=data['password'])
-        if user and user.active:
+        if user and user.is_active:
             return user
         raise serializers.ValidationError("could not validate provided credentials")
 

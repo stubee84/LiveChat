@@ -7,6 +7,7 @@ from asgiref.sync import async_to_sync
 from .consumers import ChatConsumer
 from .controllers import main
 from django.views.decorators.csrf import csrf_exempt, csrf_protect
+from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from twilio.twiml.voice_response import VoiceResponse, Connect, Stream
@@ -22,6 +23,7 @@ class UserRegistration(views.APIView):
                 return response.Response(data=serializer.data, status=status.HTTP_201_CREATED)
         return response.Response(status=status.HTTP_400_BAD_REQUEST)
 
+@method_decorator(csrf_protect, name="post")
 class UserLogin(generics.CreateAPIView):
     serializer_class = LoginSerializer
 

@@ -1,13 +1,17 @@
 from djongo import models
+from datetime import datetime
 
 class User(models.Model):
     id = models.ObjectIdField()
-    active = models.BooleanField(default=True, null=False)
+    is_active = models.BooleanField(default=True, null=False)
     email = models.CharField(max_length=30, unique=True, null=False, blank=False)
     password = models.CharField(max_length=30, null=False, blank=False)
     temporary = models.BooleanField(default=False, null=False)
-    last_login = models.DateTimeField(max_lenght=30, null=False)
+    last_login = models.DateTimeField(max_length=30, null=False, auto_now=True)
     session_token = models.CharField(max_length=100, null=True)
+
+    def is_authenticated(self):
+        return True
 
 class Caller(models.Model):
     id = models.ObjectIdField()

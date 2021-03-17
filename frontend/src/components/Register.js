@@ -36,7 +36,6 @@ class Register extends Component {
     fetch("/api/register/", {
       method: "POST",
       headers:  {
-        'X-CSRFTOKEN': getCookie('csrftoken'),
         'Accept': 'application/json',
         'Content-Type': 'application/json'
       },
@@ -51,7 +50,7 @@ class Register extends Component {
       }
 
       this.setState({email: "", password1: "", password2: ""})
-      window.location.href = "/login"
+      window.location.assign = "/login/"
     }).catch(error => {
       console.error(error);
       this.setState({email: "", password1: "", password2: ""})
@@ -92,21 +91,6 @@ class Register extends Component {
       </form>
     )
   }
-}
-
-function getCookie(name) {
-  var cookieValue = null;
-  if (document.cookie && document.cookie !== '') {
-      var cookies = document.cookie.split(';');
-      for (var i = 0; i < cookies.length; i++) {
-        var cookie = cookies[i].trim();
-        if (cookie.substring(0, name.length + 1) === (name + '=')) {
-            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-            break;
-        }
-      }
-  }
-  return cookieValue;
 }
 
 const mapStateToProps = state => {

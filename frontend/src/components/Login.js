@@ -7,34 +7,54 @@ import {Link} from "react-router-dom";
 class Login extends Component {
 
   state = {
-    username: "",
-    password: "",
+    email: "",
+    password: ""
   }
 
   onSubmit = e => {
     e.preventDefault();
-  }
 
-  componentDidMount = e => {
-    document.getElementById('csrfmiddlewaretoken').value = getCookie("csrftoken");
+    fetch("/api/login/", {
+      method: "POST",
+      headers:  {
+        'X-CSRFTOKEN': getCookie('csrftoken'),
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({email: this.state.email, password: this.state.password})
+    }).then(async response => {
+      var data = await response.json();
+
+      if (!response.ok) {
+        var err = (data && data.message) || response.status;
+        console.error(err);
+        return Promise.reject(err);
+      }
+
+      this.setState({email: "", password: ""});
+      window.location.assign("/chat/")
+    }).catch(error => {
+      console.error(error);
+      this.setState({email: "", password: ""});
+      return Promise.reject(error);
+    });
   }
 
   render() {
     return (
       <form onSubmit={this.onSubmit} action="/api/login/" method="post">
-        <input type="hidden" id="csrfmiddlewaretoken" name="csrfmiddlewaretoken"/>
         <fieldset>
           <legend>Login</legend>
           <p>
             <label htmlFor="username">Username: </label>
             <input
-              type="text" id="username"
-              onChange={e => this.setState({username: e.target.value})} />
+              type="text" id="email" name="email"
+              onChange={e => this.setState({email: e.target.value})} />
           </p>
           <p>
             <label htmlFor="password">Password: </label>
             <input
-              type="password" id="password"
+              type="password" id="password" name="password"
               onChange={e => this.setState({password: e.target.value})} />
           </p>
           <p>

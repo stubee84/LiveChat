@@ -6,7 +6,7 @@ from ..models import User
 class CustomAuth(BaseBackend):
     def authenticate(self, request: request.HttpRequest = None, username: str = None, password: str = None) -> User:
         try:
-            login: User = self.get_user(email=username)
+            login: User = User.objects.get(email=username)
         except User.DoesNotExist:
             return None
 
@@ -16,8 +16,8 @@ class CustomAuth(BaseBackend):
 
         return None
     
-    def get_user(self, email: str):
+    def get_user(self, user_id):
         try:
-            return User.objects.get(email=email)
+            return User.objects.get(id=user_id)
         except User.DoesNotExist:
             raise User.DoesNotExist
