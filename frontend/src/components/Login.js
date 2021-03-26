@@ -1,6 +1,6 @@
 import React, {Component} from "react";
 import {connect} from "react-redux";
-
+import cookies from "./Cookies"
 import {Link} from "react-router-dom";
 
 
@@ -17,7 +17,7 @@ class Login extends Component {
     fetch("/api/login/", {
       method: "POST",
       headers:  {
-        'X-CSRFTOKEN': getCookie('csrftoken'),
+        'X-CSRFTOKEN': cookies('csrftoken'),
         'Accept': 'application/json',
         'Content-Type': 'application/json'
       },
@@ -67,21 +67,6 @@ class Login extends Component {
       </form>
     )
   }
-}
-
-function getCookie(name) {
-  var cookieValue = null;
-  if (document.cookie && document.cookie !== '') {
-      var cookies = document.cookie.split(';');
-      for (var i = 0; i < cookies.length; i++) {
-        var cookie = cookies[i].trim();
-        if (cookie.substring(0, name.length + 1) === (name + '=')) {
-            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-            break;
-        }
-      }
-  }
-  return cookieValue;
 }
 
 const mapStateToProps = state => {

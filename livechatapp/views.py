@@ -45,6 +45,12 @@ class UserLogin(generics.CreateAPIView):
             print(f'error: {err}')
             return response.Response(status=status.HTTP_400_BAD_REQUEST)
 
+@method_decorator(login_required, name="get")
+@method_decorator(csrf_protect, name="get")
+class GetNumbers(generics.ListAPIView):
+    queryset = Caller.objects.values('number')
+    serializer_class: NumberSerializer = NumberSerializer
+
 @login_required
 def index(request: request.HttpRequest):
     return render(request, 'index.html')

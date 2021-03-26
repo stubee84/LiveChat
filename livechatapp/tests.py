@@ -1,6 +1,6 @@
 from django.urls import reverse
 from rest_framework import test, status
-from .models import User
+from .models import User, Caller
 from .controllers.main import password_management
 
 class UserCreateTest(test.APITestCase):
@@ -37,3 +37,19 @@ class UserLoginTest(test.APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['user']['email'], data['email'])
         self.assertFalse('password' in response.data)
+
+class GetNumbersTest(UserLoginTest):
+    def setUp(self):
+        super().setUp()
+        
+        Caller.objects.create(number=19194442222,country='USA',city='Miami',state='FL')
+        Caller.objects.create(number=14243335555,country='USA',city='Boston',state='MA')
+        self.numbers_url = reverse('numbers')
+
+    def test_get_numbers(self):
+        super().test_get_user()
+        data = [{'number':19194442222},{'number':14243335555}]
+        response = self.client.get(path=self.numbers_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, data)

@@ -1,9 +1,13 @@
 import React, { Component } from "react";
 import {Route, Switch, BrowserRouter} from "react-router-dom";
 import { Provider } from "react-redux";
+import "core-js/stable";
+import "regenerator-runtime/runtime";
+
 import Login from "./components/Login";
 import NotFound from "./components/NotFound";
 import Register from "./components/Register";
+import Numbers from "./components/Numbers";
 import { render } from "react-dom";
 
 import { createStore } from "redux";
@@ -20,6 +24,7 @@ class App extends Component {
             <Route exact path="/" component={Login} />
             <Route exact path="/login" component={Login} />
             <Route exact path="/register" component={Register} />
+            <Route exact path="/chat" component={Numbers} />
             <Route component={NotFound} />
           </Switch>
         </BrowserRouter>

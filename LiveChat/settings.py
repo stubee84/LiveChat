@@ -61,17 +61,21 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
 ]
 
-WEBPACK_LOADER = {
-    'DEFAULT': {
-            'BUNDLE_DIR_NAME': 'bundles/',
-            'STATS_FILE': os.path.join(BASE_DIR, 'webpack-stats.dev.json'),
-        }
-}
+# WEBPACK_LOADER = {
+#     'DEFAULT': {
+#             'BUNDLE_DIR_NAME': 'bundles/',
+#             'STATS_FILE': os.path.join(BASE_DIR, 'webpack-stats.dev.json'),
+#         }
+# }
 
 AUTHENTICATION_BACKENDS = [
     'livechatapp.customization.auth.CustomAuth',
     'django.contrib.auth.backends.ModelBackend'
 ]
+
+# SESSION Settings
+SESSION_COOKIE_AGE = 3600
+SESSION_COOKIE_HTTPONLY = True
 
 ROOT_URLCONF = 'LiveChat.urls'
 
