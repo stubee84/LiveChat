@@ -7,7 +7,7 @@ import "regenerator-runtime/runtime";
 import Login from "./components/Login";
 import NotFound from "./components/NotFound";
 import Register from "./components/Register";
-import Numbers from "./components/Numbers";
+import Dashboard from "./components/Dashboard";
 import { render } from "react-dom";
 
 import { createStore } from "redux";
@@ -24,7 +24,7 @@ class App extends Component {
             <Route exact path="/" component={Login} />
             <Route exact path="/login" component={Login} />
             <Route exact path="/register" component={Register} />
-            <Route exact path="/chat" component={Numbers} />
+            <Route exact path="/chat" component={Dashboard} />
             <Route component={NotFound} />
           </Switch>
         </BrowserRouter>
@@ -32,28 +32,6 @@ class App extends Component {
     );
   }
 }
-
-// //   render() {
-// //     return (
-// //       <Provider store={store}>
-// //         <BrowserRouter>
-// //           <Switch>
-// //             <Route exact path="/" component={Login}/>
-// //           </Switch>
-// //         </BrowserRouter>
-// //       </Provider>
-// //       <ul>
-// //         {this.state.data.map(contact => {
-// //           return (
-// //             <li key={contact.id}>
-// //               {contact.name} - {contact.email}
-// //             </li>
-// //           );
-// //         })}
-// //       </ul>
-// //     );
-// //   }
-// // }
 
 export default App;
 

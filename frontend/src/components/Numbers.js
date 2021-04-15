@@ -1,54 +1,74 @@
 import React, {Component} from "react";
+import LiveChat from "./LiveChat";
+import "./styles/numbers.css";
 
 class Numbers extends Component {
 
+  lc = new LiveChat();
   state = {
     numbersList: [],
+    messages: [],
   };
 
   componentDidMount() {
     this.getNumbers();
   }
 
+  async getMessages() {
+    var url = "/api/messages/";
+    this.state.messages = await this.get(url);
+    this.setState({messages: this.state.messages.map((message) => message['message'])});
+
+    this.state.messages.forEach(this.lc.loadChatRoom)
+  }
+
   getNumbers() {
-    fetch("/api/numbers/", {
-        method: "GET",
-        headers:  {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-      }).then(async response => {
-        var data = await response.json();
+    var url = "/api/numbers/";
+    this.get(url).then((result) => {
+      var numbers = result;
+      this.setState({numbersList: numbers.map((number) => 
+        <tr key={number["number"]}>
+          <td onClick={this.getMessages}>{number['number'] }</td>
+        </tr>
+      )});
+    });
+  }
+
+  get(url) {
+    var promise = fetch(url, {
+      method: "GET",
+      headers:  {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+    }).then(async response => {
+      var data = await response.json();
         
-        if (!response.ok) {
-          var err = (data && data.message) || response.status;
-          console.error(err);
-          return Promise.reject(err);
-        }
-  
-        this.setState({numbersList: data.map((number) => 
-          <li id={number['number']}>{number['number']}</li>
-        )});
-      }).catch(error => {
-        console.error(error);
-        return Promise.reject(error)
-      });
+      if (!response.ok) {
+        var err = (data && data.message) || response.status;
+        console.error(err);
+        return Promise.reject(err);
+      }
+
+      return data;
+    }).catch(error => {
+      console.error(error);
+      return Promise.reject(error);
+    });
+    return promise;
   }
 
-  loadChatRoom() {
-
-  }
-//style="display:inline-block; border:1px solid #000; padding:20px;"
-// style="list-style-type:none;"
   render() {
     return (
       <div className='dashboard-numbers-container'>
-        <h1 id='numbers'>Numbers</h1>
-        <ul onClick={this.loadChatRoom}>
-          {this.state.numbersList}
-          <li></li>
-          <li><input type="button" value="Edit"/></li>
-        </ul>
+        <h2 id='numbers-header'>Numbers</h2>
+        <table className="numbers-table" id="numbers-table">
+          <tbody id="numbers-table-body">
+            {this.state.numbersList}
+          </tbody>
+        </table>
+        <br></br>
+        <input id="edit-numbers-button" type="button" value="Edit"/>
       </div>
     )
   }

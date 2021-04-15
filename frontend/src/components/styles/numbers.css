@@ -1,0 +1,21 @@
+.numbers-table {
+    border-collapse: collapse;
+    border: 3px solid #ddd;
+}
+
+.numbers-table td,
+.numbers-table th {
+    border: 1px solid #ddd;
+    padding: 6px;
+}
+
+.numbers-table tr:hover {
+    background-color: #ddd;
+}
+
+.numbers-table th {
+    padding: 10px;
+    text-align: center;
+    background-color: #4caf50;
+    color: white;
+}
