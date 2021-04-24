@@ -1,6 +1,7 @@
+from collections import OrderedDict
 from django.urls import reverse
 from rest_framework import test, status
-from .models import User, Caller
+from .models import User, Caller, Message
 from .controllers.main import password_management
 
 class UserCreateTest(test.APITestCase):
@@ -53,3 +54,20 @@ class GetNumbersTest(UserLoginTest):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, data)
+
+class GetMessagesTest(UserLoginTest):
+    messages = [{'message':'This is my first basic text message for testing.'},{'message':'This is my second basic text message for testing.'}]
+    def setUp(self):
+        super().setUp()
+
+        Message.objects.create(number=19194442222,call_id=1, message_type='S', message=self.messages[0])
+        Message.objects.create(number=14243335555,call_id=2, message_type='S', message=self.messages[1])
+        self.messages_url = reverse('messages',args=['19194442222'])
+
+    def test_get_messages(self):
+        super().test_get_user()
+
+        response = self.client.get(path=self.messages_url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data[0]['message'], str(self.messages[0]))

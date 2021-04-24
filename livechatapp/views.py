@@ -51,6 +51,15 @@ class GetNumbers(generics.ListAPIView):
     queryset = Caller.objects.values('number')
     serializer_class: NumberSerializer = NumberSerializer
 
+@method_decorator(login_required, name="get")
+@method_decorator(csrf_protect, name="get")
+class GetMessages(generics.ListAPIView):
+    serializer_class: MessageSerializer = MessageSerializer
+
+    def get_queryset(self):
+        num = self.kwargs['number']
+        return Message.objects.filter(number=num)
+
 @login_required
 def index(request: request.HttpRequest):
     return render(request, 'index.html')

@@ -2,9 +2,15 @@
 import json, re, base64, sys
 from django.utils.functional import LazyObject
 from .controllers.main import twilio_controller, google_transcribe_speech, google_text_to_speech
-from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.generic.websocket import AsyncWebsocketConsumer, WebsocketConsumer
 
 num_reg = re.compile(r'.*:(\d{10}|\d{11}|(\+\d{11})):.*')
+
+class DefaultUrl(WebsocketConsumer):
+    def connect(self):
+        print(f"Received connection to URL {self.scope['path']} from {self.scope['client'][0]}")
+        self.close()
+
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):

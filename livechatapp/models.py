@@ -29,6 +29,7 @@ class Call(models.Model):
 class Message(models.Model):
     id = models.ObjectIdField()
     call_id = models.IntegerField()
+    number = models.IntegerField()
     MESSAGE_TYPES = (
         ('S', 'SMS'),
         ('R', 'Inbound Recorded Call'),

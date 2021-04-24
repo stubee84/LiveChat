@@ -2,28 +2,25 @@ import React, {Component} from "react";
 import "./styles/livechat.css"
 
 class LiveChat extends Component {
-
-    componentDidMount() {
-        this.initWebSocket();
-    }
-
-    loadChatRoom(message) {
+    loadChatRoom(number) {
+        this.initWebSocket(number);
         document.querySelector("chat-log").value = '';
         document.querySelector("chat-log").value += (message + '\n');
     }
 
-    initWebSocket() {
+    initWebSocket(number) {
         this.chatSocket = new WebSocket(
             'ws://'
             + window.location.host
             + '/ws/chat/'
+            + number + '/'
         );
     }
 
     send(number) {
     }
+    
     render () {
-        this.initWebSocket();
         return (
             <div id="dashboard-chat-container">
                 <h2 id="chat-window">Chat</h2>

@@ -46,7 +46,17 @@ class NumberSerializer(serializers.ModelSerializer):
         model = Caller
         fields = ['number']
 
+# class GetMessagesSerializer(serializers.Serializer):
+#     number = serializers.IntegerField(required=True)
+
+#     # def get(self, num: int):
+#     #     return Message.objects.filter(number=num).values('message')
+
+#     class Meta:
+#         model = Message
+#         fields = ['number','message']
+
 class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
-        fields = ['call_id','message_type','message']
+        fields = ['number','message_type','message']

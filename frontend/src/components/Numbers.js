@@ -14,12 +14,13 @@ class Numbers extends Component {
     this.getNumbers();
   }
 
-  async getMessages() {
-    var url = "/api/messages/";
+  async getMessages(number) {
+    var url = "/api/messages/"+number+"/";
     this.state.messages = await this.get(url);
     this.setState({messages: this.state.messages.map((message) => message['message'])});
 
-    this.state.messages.forEach(this.lc.loadChatRoom)
+    this.lc.loadChatRoom(this.state.messages);
+    // this.state.messages.forEach(this.lc.loadChatRoom(row.innerText))
   }
 
   getNumbers() {
@@ -27,8 +28,8 @@ class Numbers extends Component {
     this.get(url).then((result) => {
       var numbers = result;
       this.setState({numbersList: numbers.map((number) => 
-        <tr key={number["number"]}>
-          <td onClick={this.getMessages}>{number['number'] }</td>
+        <tr key={number["number"]} onClick={this.getMessages(this)}>
+          <td>{number['number'] }</td>
         </tr>
       )});
     });

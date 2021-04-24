@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, re_path
 from .views import *
 
 urlpatterns = [
@@ -6,6 +6,7 @@ urlpatterns = [
     path('login/', UserLogin.as_view(), name='login'),
     path('register/', UserRegistration.as_view(), name='register'),
     path('numbers/', GetNumbers.as_view(), name='numbers'),
+    re_path('^messages/(?P<number>\d{11})/$', GetMessages.as_view(), name='messages'),
     path('sms/', sms, name='sms'),
     path('voice/', voice, name='voice'),
     path('record/', record, name='record'),
