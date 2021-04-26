@@ -19,8 +19,7 @@ class Numbers extends Component {
     this.state.messages = await this.get(url);
     this.setState({messages: this.state.messages.map((message) => message['message'])});
 
-    this.lc.loadChatRoom(this.state.messages);
-    // this.state.messages.forEach(this.lc.loadChatRoom(row.innerText))
+    this.lc.loadChatRoom(number, this.state.messages);
   }
 
   getNumbers() {
@@ -28,7 +27,9 @@ class Numbers extends Component {
     this.get(url).then((result) => {
       var numbers = result;
       this.setState({numbersList: numbers.map((number) => 
-        <tr key={number["number"]} onClick={this.getMessages(this)}>
+        //in Javascript if I pass just the function then it is called upon creation but if I pass the reference, i.e. () => this.getMessages,
+        //then it will be called only after action
+        <tr key={number["number"]} onClick={() => this.getMessages(number["number"])}>
           <td>{number['number'] }</td>
         </tr>
       )});
