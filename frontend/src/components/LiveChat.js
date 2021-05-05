@@ -2,22 +2,34 @@ import React, {Component} from "react";
 import "./styles/livechat.css"
 
 class LiveChat extends Component {
+    state = {
+        ws: WebSocket,
+        connectedNumber: '',
+    }
+
     loadChatRoom(number, messages) {
         this.initWebSocket(number);
 
-        document.querySelector("chat-log").value = '';
+        document.getElementById("chat-log").value = '';
         messages.map((message) => {
-            document.querySelector("chat-log").value += (message + '\n');
+            document.getElementById("chat-log").value += (message + '\n');
         })
     }
 
     initWebSocket(number) {
-        this.chatSocket = new WebSocket(
+        //check to keep number of open websocket connections to 1
+        if (this.state.ws.readyState === this.state.ws.OPEN) {
+            console.log("closing connection to socket: /ws/chat/"+number)
+            this.ws.close();
+        }
+        console.log("connecting to socket: /ws/chat/"+number)
+        this.setState({ws: new WebSocket(
             'ws://'
             + window.location.host
             + '/ws/chat/'
             + number + '/'
-        );
+        )});
+        this.setState({connectedNumber: number});
     }
 
     send(number) {
@@ -37,7 +49,6 @@ class LiveChat extends Component {
                             <option value="sms">SMS</option>
                             <option value="inbound_record_call">Inbound Recorded Call</option>
                             <option value="outbound_text_call">Outbound Text Call</option>
-                            <option value="live_inbound_transcription">Live Inbound Transcription</option>
                             <option value="live_inbound_transcription">Live Inbound Transcription</option>
                             <option value="live_outbound_text_to_speech">Live outbound text to speech</option>
                         </select>

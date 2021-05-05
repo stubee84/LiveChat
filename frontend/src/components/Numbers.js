@@ -8,18 +8,38 @@ class Numbers extends Component {
   state = {
     numbersList: [],
     messages: [],
+    connectedCell: '',
   };
 
   componentDidMount() {
     this.getNumbers();
   }
 
+  changeColor(id) {
+    if (id == this.state.connectedCell) {
+      return false;
+    }
+
+    if (this.state.connectedCell !== '') {
+      document.getElementById(this.state.connectedCell).style.backgroundColor = (document.getElementById(this.state.connectedCell).style.backgroundColor == '') ? '#DDDDDD' : '';
+    }
+    
+    document.getElementById(id).style.backgroundColor = (document.getElementById(id).style.backgroundColor == '') ? '#DDDDDD' : '';
+
+    return true;
+ }  
+
   async getMessages(number) {
+    if (!this.changeColor(number)) {
+      console.log("already connected. doing nothing");
+      return
+    }
     var url = "/api/messages/"+number+"/";
     this.state.messages = await this.get(url);
     this.setState({messages: this.state.messages.map((message) => message['message'])});
 
     this.lc.loadChatRoom(number, this.state.messages);
+    this.setState({connectedCell: number});
   }
 
   getNumbers() {
@@ -30,7 +50,7 @@ class Numbers extends Component {
         //in Javascript if I pass just the function then it is called upon creation but if I pass the reference, i.e. () => this.getMessages,
         //then it will be called only after action
         <tr key={number["number"]} onClick={() => this.getMessages(number["number"])}>
-          <td>{number['number'] }</td>
+          <td id={number["number"]}>{number['number'] }</td>
         </tr>
       )});
     });
