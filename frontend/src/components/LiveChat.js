@@ -7,12 +7,28 @@ class LiveChat extends Component {
         connectedNumber: '',
     }
 
+    componentDidMount() {
+        this.initWebSocket("general");
+        document.querySelector('#chat-message-input').focus();
+    }
+
+    componentDidUpdate() {        
+        this.receive();
+    }
+
+    receive() {
+        this.state.ws.onmessage = message => {
+            var data = JSON.parse(message.data);
+            document.querySelector('#chat-log').value += (data.message + '\n');
+        }
+    }
+
     loadChatRoom(number, messages) {
         this.initWebSocket(number);
 
-        document.getElementById("chat-log").value = '';
+        document.querySelector("#chat-log").value = '';
         messages.map((message) => {
-            document.getElementById("chat-log").value += (message + '\n');
+            document.querySelector("#chat-log").value += (message + '\n');
         })
     }
 
@@ -22,17 +38,27 @@ class LiveChat extends Component {
             console.log("closing connection to socket: /ws/chat/"+number)
             this.ws.close();
         }
-        console.log("connecting to socket: /ws/chat/"+number)
         this.setState({ws: new WebSocket(
             'ws://'
             + window.location.host
             + '/ws/chat/'
             + number + '/'
         )});
+        console.log("successfully connected to /ws/chat/"+number);
         this.setState({connectedNumber: number});
     }
 
-    send(number) {
+    send(key) {
+        if (key === 'Enter' || key === 0) {
+            var text = document.querySelector("#chat-message-input").value;
+            
+            this.state.ws.send(JSON.stringify({
+                "message": text,
+                "stream": "False",
+            }));
+
+            document.querySelector("#chat-message-input").value = "";
+        }
     }
     
     render () {
@@ -54,10 +80,10 @@ class LiveChat extends Component {
                         </select>
                     </div>
                     <div id="input-text">
-                        <input onKeyUp={this.send()} id="chat-message-input" type="text" size="100"/>
+                        <input onKeyUp={e => this.send(e.key)} id="chat-message-input" type="text" size="100"/>
                     </div>
                     <div id="input-button">
-                        <input onClick={this.send()} id="chat-message-submit" type="button" value="Send"/>
+                        <input onClick={e => this.send(e.button)} id="chat-message-submit" type="button" value="Send"/>
                     </div>
                 </div>
             </div>

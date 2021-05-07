@@ -14,7 +14,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['active','email','password','temporary','session_token']
+        fields = ['is_active','email','password','temporary','session_token']
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:

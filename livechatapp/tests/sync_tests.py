@@ -2,10 +2,12 @@ from collections import OrderedDict
 from django.urls import reverse
 from django.test import TestCase
 from rest_framework import test, status
-# from asgiref.sync import async_to_sync
-# from unittest import mock
 from ..models import User, Caller, Message
 from ..controllers.main import password_management
+
+'''
+    command: python.exe .\manage.py test livechatapp.tests.sync_tests.UserCreateTest
+'''
 
 class UserCreateTest(test.APITestCase):
     def setUp(self):
