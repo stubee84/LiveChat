@@ -27,7 +27,13 @@ class Numbers extends Component {
     document.getElementById(id).style.backgroundColor = (document.getElementById(id).style.backgroundColor == '') ? '#DDDDDD' : '';
 
     return true;
- }  
+ }
+
+ editNumbers() {
+  if (this.state.connectedCell === '') {
+  }
+  return
+ }
 
   async getMessages(number) {
     if (!this.changeColor(number)) {
@@ -90,7 +96,7 @@ class Numbers extends Component {
           </tbody>
         </table>
         <br></br>
-        <input id="edit-numbers-button" type="button" value="Edit"/>
+        <input onClick={this.editNumbers()} id="edit-numbers-button" type="button" value="Edit"/>
       </div>
     )
   }

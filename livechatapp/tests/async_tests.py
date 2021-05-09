@@ -1,8 +1,10 @@
 from channels.testing import WebsocketCommunicator
-from ..consumers import GeneralChatConsumer
+from ..consumers import GeneralChatConsumer, get
+from ..models import Message
 import json, pytest
 
 @pytest.mark.asyncio
+@pytest.mark.django_db
 async def test_general_consumer():
     communicator = WebsocketCommunicator(GeneralChatConsumer, path="/chat/general")
     connected, subprotocol = await communicator.connect()
@@ -15,3 +17,6 @@ async def test_general_consumer():
     assert send_msg == json.loads(rcv_msg['text'])
 
     await communicator.disconnect()
+
+    msg_saved = await get(model=Message, message=send_msg['message'], message_type='C')
+    assert send_msg['message'] == msg_saved.message
