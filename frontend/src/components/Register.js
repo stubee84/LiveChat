@@ -1,5 +1,5 @@
 import React, {Component} from "react";
-import {connect} from "react-redux";
+// import {connect} from "react-redux";
 
 import {Link} from "react-router-dom";
 
@@ -93,12 +93,4 @@ class Register extends Component {
   }
 }
 
-const mapStateToProps = state => {
-  return {};
-}
-
-const mapDispatchToProps = dispatch => {
-  return {};
-}
-
-export default connect(mapStateToProps, mapDispatchToProps)(Register);
+export default Register;

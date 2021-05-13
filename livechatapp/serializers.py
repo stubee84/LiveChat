@@ -49,11 +49,11 @@ class NumberSerializer(serializers.ModelSerializer):
 class MessageSerializer(serializers.ModelSerializer):
     number = serializers.IntegerField()
     call_id = serializers.IntegerField()
-    message_type = serializers.ChoiceField(choices=('C','S','R','O','LI','LO'), required=True, default='C')
+    message_type = serializers.ChoiceField(choices=('C','S','R','O','LI','LO'), required=True)
     message = serializers.CharField(required=True)
 
     def create(self, validated_data: dict):
-        Message.objects.create(number=self.number, call_id=self.call_id, message_type=self.message_type, message=self.message)
+        Message.objects.create(**validated_data)
 
     class Meta:
         model = Message

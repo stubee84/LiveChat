@@ -1,5 +1,5 @@
 import React, {Component} from "react";
-import {connect} from "react-redux";
+// import {connect} from "react-redux";
 import cookies from "./Cookies"
 import {Link} from "react-router-dom";
 
@@ -69,12 +69,4 @@ class Login extends Component {
   }
 }
 
-const mapStateToProps = state => {
-  return {};
-}
-
-const mapDispatchToProps = dispatch => {
-  return {};
-}
-
-export default connect(mapStateToProps, mapDispatchToProps)(Login);
+export default Login;

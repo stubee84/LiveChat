@@ -13,7 +13,7 @@ def insert(model, **attrs):
     model(**attrs).save(force_insert=True)
 
 @database_sync_to_async
-def get(model, **attrs):
+def fetch(model, **attrs):
     return model.objects.get(**attrs)
 
 class DefaultUrl(WebsocketConsumer):
