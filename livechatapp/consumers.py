@@ -76,43 +76,34 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     # Receive message from WebSocket
     async def receive(self, text_data):
+        print(text_data)
         text_data_json = json.loads(text_data)
         message = text_data_json['message']
 
-        matches = num_reg.match(message)
-        if matches is not None:
-            try:
-                to_number = matches.groups()[0]
-                text = str(message).split(':')
-                method = text[0]
-                message = text[len(text)-1].strip()
-            
-                tc = twilio_controller()
-                await tc.connect(destination="Twilio")
-                
-                if method == "text":
-                    result = await tc.twilio_send_message(to_number=to_number,body=message)
-                else:
-                    result = await tc.twilio_call_with_recording(to_number=to_number,body=message)
 
-                if result == False:
-                    message = "Failed to send message. {}".format(message)
-            except IndexError as e:
-                message = "Failed to send message. {}".format(e)
-        else:
-            text = str(message).split(':')
-            method = text[0]
-            stream_sid = text[1]
-            message = text[len(text)-1].strip()
-
+        if 'stream' in text_data_json:
             text_to_speech = google_text_to_speech()
             out_bytes = await text_to_speech.transcribe_text(text=message)
 
             #implement some error handling here
             if sys.getsizeof(out_bytes) != 0:
-                await text_to_speech.begin_audio_stream(streamSid=stream_sid, in_bytes=out_bytes)
+                await text_to_speech.begin_audio_stream(streamSid=text_data_json['stream'], in_bytes=out_bytes)
+        elif text_data_json['type'] == 'Twilio':
+            tc = await twilio_controller()
+            if 'sms' in text_data_json:
+                sms = text_data_json['sms']
+            
+                if 'local' in sms:
+                    callable = tc.twilio_send_message
+            elif 'call' in text_data_json:
+                call = text_data_json['call']
 
-        # Send message to room group
+                if 'local' in call:
+                    callable = tc.twilio_call_with_recording
+        
+            if await callable(to_number=self.room_name, body=message) == False:
+                message = "Failed to send message. {}".format(message)
+
         await self.channel_layer.group_send(
             self.room_group_name,
             {
@@ -120,6 +111,44 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'message': message
             }
         )
+
+
+        # matches = num_reg.match(message)
+        # if matches is not None:
+        #     try:
+        #         to_number = matches.groups()[0]
+        #         text = str(message).split(':')
+        #         method = text[0]
+        #         message = text[len(text)-1].strip()
+            
+        #         tc = twilio_controller()
+        #         await tc.connect(destination="Twilio")
+                
+        #         if method == "text":
+        #             result = await tc.twilio_send_message(to_number=to_number,body=message)
+        #         else:
+        #             result = await tc.twilio_call_with_recording(to_number=to_number,body=message)
+
+        #         if result == False:
+        #             message = "Failed to send message. {}".format(message)
+        #     except IndexError as e:
+        #         message = "Failed to send message. {}".format(e)
+        # else:
+        #     text_to_speech = google_text_to_speech()
+        #     out_bytes = await text_to_speech.transcribe_text(text=message)
+
+        #     #implement some error handling here
+        #     if sys.getsizeof(out_bytes) != 0:
+        #         await text_to_speech.begin_audio_stream(streamSid=stream_sid, in_bytes=out_bytes)
+
+        # # Send message to room group
+        # await self.channel_layer.group_send(
+        #     self.room_group_name,
+        #     {
+        #         'type': 'chat_message',
+        #         'message': message
+        #     }
+        # )
 
     # Receive message from room group
     async def chat_message(self, event):
@@ -132,18 +161,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'stream': stream
             })
         except KeyError:
-            text = json.dumps({
-                'message': message
-            })
+            text = message
 
         # Send message to WebSocket
-        await self.send(text_data=text)
+        await self.send(text_data=json.dumps(text))
 
 class StreamConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         await self.accept()
         self.transcribe_speech = google_transcribe_speech()
-        await transcribe_speech.start_transcriptions_stream()
+        await self.transcribe_speech.start_transcriptions_stream()
 
     async def disconnect(self, close_code):
         pass

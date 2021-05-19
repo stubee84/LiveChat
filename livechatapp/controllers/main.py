@@ -9,8 +9,8 @@ from django.contrib.auth.hashers import PBKDF2PasswordHasher
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(dotenv_path=dotenv_path)
 
-sid = os.environ.get("TWILIO_ACCOUNT_SID")
-token = os.environ.get("TWILIO_AUTH_TOKEN")
+# sid = os.environ.get("TWILIO_ACCOUNT_SID")
+# token = os.environ.get("TWILIO_AUTH_TOKEN")
 phone_number = os.environ.get("TWILIO_NUMBER")
 ws_url = os.environ.get("WEBSOCKET_URL")
 twilio_url = "https://api.twilio.com/"
@@ -207,21 +207,24 @@ class google_transcribe_speech:
         return transcription
 
 class twilio_controller:
+    sid = os.environ.get("TWILIO_ACCOUNT_SID")
+    token = os.environ.get("TWILIO_AUTH_TOKEN")
+    
     def __init__(self):
     #Rest client variable. Maybe call this rest_clients
-        self.twilio_client: twilio.rest.Client = None
+        self.twilio_client: twilio.rest.Client = twilio.rest.Client(username=self.sid,password=self.token)
     
-    async def connect(self, **kwargs):
-        try:
-            if kwargs['destination'].lower() == "twilio":
-                await self.twilio_connect(sid=sid,token=token)
-        except KeyError:
-            return
+    # async def connect(self, **kwargs):
+    #     try:
+    #         if kwargs['destination'].lower() == "twilio":
+    #             await self.twilio_connect(sid=sid,token=token)
+    #     except KeyError:
+    #         return
 
-    #Maybe: put these two functitons into their own twilio child class
-    async def twilio_connect(self, sid: str, token: str):
-        if self.twilio_client is None:
-            self.twilio_client = twilio.rest.Client(username=sid,password=token)
+    # #Maybe: put these two functitons into their own twilio child class
+    # async def twilio_connect(self, sid: str, token: str):
+    #     if self.twilio_client is None:
+    #         self.twilio_client = twilio.rest.Client(username=sid,password=token)
         
     async def twilio_send_message(self, to_number: str, body: str, from_number: str = phone_number) -> bool:
         result = self.twilio_client.messages.create(to=to_number,from_=from_number,body=body)

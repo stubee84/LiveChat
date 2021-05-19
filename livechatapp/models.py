@@ -1,5 +1,4 @@
 from djongo import models
-from datetime import datetime
 
 class User(models.Model):
     id = models.ObjectIdField()
@@ -15,7 +14,7 @@ class User(models.Model):
 
 class Caller(models.Model):
     id = models.ObjectIdField()
-    number = models.IntegerField(unique=True)
+    number = models.CharField(max_length=15, unique=True)
     country = models.CharField(max_length=10)
     city = models.CharField(max_length=30)
     state = models.CharField(max_length=10)
@@ -23,7 +22,7 @@ class Caller(models.Model):
 class Call(models.Model):
     id = models.ObjectIdField()
     sid = models.CharField(max_length=50, unique=True)
-    length_of_call = models.TimeField()
+    length_of_call = models.IntegerField()
     caller_id = models.IntegerField()
 
 class Message(models.Model):

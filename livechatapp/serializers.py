@@ -57,4 +57,4 @@ class MessageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Message
-        fields = ['number','message_type','message']
+        fields = ['call_id','number','message_type','message']

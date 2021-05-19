@@ -1,11 +1,11 @@
 import json, websocket, asyncio, channels.layers, django.http.request as request
 from rest_framework import response, status, views, generics
-from .models import *
-from .serializers import *
+from ..models import *
+from ..serializers import *
 from django.shortcuts import render
 from asgiref.sync import async_to_sync
-from .consumers import ChatConsumer
-from .controllers import main
+from ..consumers import ChatConsumer
+from ..controllers import main
 from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
@@ -70,34 +70,39 @@ def sms(request: request.HttpRequest):
     text = request.POST.get("Body")
     from_number = request.POST.get("From")
 
-    text = text.split(":")
+    # text = text.split(":")
     message: dict = dict()
     try:
-        room_name = text[0].strip(' ')
-        message = {"message":from_number + ': ' + text[1].strip(' ')}
-
-        from_number = int(str(from_number).strip('+'))
+        # room_name = text[0].strip(' ')
+        message = {"message":text}
+        # message['sms'] = True
+        from_number = from_number.strip('+')
         caller = Caller.objects.get(number=from_number)
         if caller is None:
-            caller = Caller.objects.create(
+            caller = Caller(
             number=from_number, 
             country=request.POST.get("FromCountry"),
             city=request.POST.get("FromCity"),
-            state=request.POST.get("FromState"))
+            state=request.POST.get("FromState")).save()
 
-        caller = models.Caller.objects.get(number=from_number)
-        call = models.Call.objects.create(sid=request.POST.get("CallSid"),length_of_call=0,caller_id=caller._id)
+        # caller = Caller.objects.get(number=from_number)
+        sid = request.POST.get("MessageSid")
+        Call(sid=sid,length_of_call=0,caller_id=caller.id).save()
+        call = Call.objects.get(sid=sid)
 
         #TODO: Create a generalized function for this which allows for injection to different sources. i.e. a remote source that requires authentication
-        ws = websocket.WebSocket()
-        ws.connect(f"ws://localhost/ws/chat/{room_name.lower()}/")
-        ws.send(json.dumps(message))
-        ws.close()
+        channel_layer = channels.layers.get_channel_layer()
+        async_to_sync(channel_layer.group_send)(f"chat_{from_number}", {"type": "chat_message", "message": message})
+        # ws = websocket.WebSocket()
+        # ws.connect(f"ws://localhost/ws/chat/{from_number}/")
+        # ws.send(json.dumps(message))
+        # ws.close()
         message["Success"] = True
-    except IndexError as e:
-        message = {"Error":"incorrect message format"}
+    except BaseException as e:
+        print(e)
+        message = {"Error":e}
     
-    msg = models.Message.objects.create(call_id=call._id,message_type="S",message=message)
+    msg = Message(call_id=call.id,number=from_number,message_type="S",message=message['message']).save()
 
     return HttpResponse(json.dumps(message))
 

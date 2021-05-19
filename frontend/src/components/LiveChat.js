@@ -2,22 +2,25 @@ import React, {Component} from "react";
 import "./styles/livechat.css"
 
 class LiveChat extends Component {
-    state = {
-        ws: WebSocket,
-        connectedNumber: '',
+    constructor(props) {
+        super(props);
+
+        this.ws = new WebSocket(
+            'ws://'
+            + window.location.host
+            + '/ws/chat/'
+            + 'general/'
+        );
+
+        this.receive()
     }
 
     componentDidMount() {
-        this.initWebSocket("general");
         document.querySelector('#chat-message-input').focus();
     }
 
-    componentDidUpdate() {        
-        this.receive();
-    }
-
     receive() {
-        this.state.ws.onmessage = message => {
+        this.ws.onmessage = message => {
             var data = JSON.parse(message.data);
             document.querySelector('#chat-log').value += (data.message + '\n');
         }
@@ -34,28 +37,33 @@ class LiveChat extends Component {
 
     initWebSocket(number) {
         //check to keep number of open websocket connections to 1
-        if (this.state.ws.readyState === this.state.ws.OPEN) {
-            console.log("closing connection to socket: /ws/chat/"+number)
+        if (this.ws.readyState === this.ws.OPEN) {
+            console.log("closing connection to socket: "+ this.ws.url)
             this.ws.close();
         }
-        this.setState({ws: new WebSocket(
+
+        this.ws = new WebSocket(
             'ws://'
             + window.location.host
             + '/ws/chat/'
             + number + '/'
-        )});
-        console.log("successfully connected to /ws/chat/"+number);
-        this.setState({connectedNumber: number});
+        );
+        console.log("successfully connected to " + this.ws.url);
+        
+        this.receive();
     }
 
     send(key) {
         if (key === 'Enter' || key === 0) {
             var text = document.querySelector("#chat-message-input").value;
+            var type = document.querySelector("#chat-message-destination").value;
             
-            this.state.ws.send(JSON.stringify({
+            var msg = {
                 "message": text,
-                "stream": "False",
-            }));
+                "type": type,
+                "stream": "False"
+            };
+            this.ws.send(JSON.stringify(msg));
 
             document.querySelector("#chat-message-input").value = "";
         }
