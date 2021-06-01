@@ -1,10 +1,13 @@
 # chat/consumers.py
 import json, re, base64, sys
+
+# from twilio.twiml.voice_response import Numbers
 # from django.utils.functional import LazyObject
-from .controllers.main import twilio_controller, google_transcribe_speech, google_text_to_speech
+from .controllers.main import twilio_controller as tc, google_transcribe_speech, google_text_to_speech
+from .controllers.twilio import twilio_database_routine
 from channels.generic.websocket import AsyncWebsocketConsumer, WebsocketConsumer
 from channels.db import database_sync_to_async
-from .models import Message, models
+from .models import Caller, Message, Call
 
 num_reg = re.compile(r'.*:(\d{10}|\d{11}|(\+\d{11})):.*')
 
@@ -76,11 +79,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     # Receive message from WebSocket
     async def receive(self, text_data):
-        print(text_data)
         text_data_json = json.loads(text_data)
         message = text_data_json['message']
+        msg_type = 'C'
 
-
+        print(text_data_json)
         if 'stream' in text_data_json:
             text_to_speech = google_text_to_speech()
             out_bytes = await text_to_speech.transcribe_text(text=message)
@@ -88,30 +91,28 @@ class ChatConsumer(AsyncWebsocketConsumer):
             #implement some error handling here
             if sys.getsizeof(out_bytes) != 0:
                 await text_to_speech.begin_audio_stream(streamSid=text_data_json['stream'], in_bytes=out_bytes)
-        elif text_data_json['type'] == 'Twilio':
-            tc = await twilio_controller()
+        else:
             if 'sms' in text_data_json:
-                sms = text_data_json['sms']
-            
-                if 'local' in sms:
-                    callable = tc.twilio_send_message
+                callable = tc.twilio_send_message
+                msg_type = 'S'
             elif 'call' in text_data_json:
-                call = text_data_json['call']
+                callable = tc.twilio_call_with_recording
+                msg_type = 'O'
+    
+            obj = await callable(to_number=self.room_name, body=message)
+            if obj is None:
+                print("Failed to send message. {}".format(message))
+                return
 
-                if 'local' in call:
-                    callable = tc.twilio_call_with_recording
-        
-            if await callable(to_number=self.room_name, body=message) == False:
-                message = "Failed to send message. {}".format(message)
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'chat_message',
+                    'message': message
+                }
+            )
 
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'chat_message',
-                'message': message
-            }
-        )
-
+        await twilio_database_routine(number=obj.number.strip('+'), call_sid=obj.call_sid, msg_type=msg_type, message=message)
 
         # matches = num_reg.match(message)
         # if matches is not None:

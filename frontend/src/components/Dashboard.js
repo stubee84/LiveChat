@@ -1,7 +1,8 @@
 import React, {Component} from "react";
-import LiveChat from "./LiveChat";
+import Chat from "./Chat";
 import Numbers from "./Numbers";
 import Logout from "./Logout";
+// import { render } from "react-dom";
 import "./styles/dashboard.css"
 
 class Dashboard extends Component {
@@ -13,7 +14,7 @@ class Dashboard extends Component {
                     <Numbers></Numbers>
                 </div>
                 <div id="chat-container">
-                    <LiveChat></LiveChat>
+                    <Chat></Chat>
                 </div>
                 <div id="logout-container">
                     <Logout></Logout>

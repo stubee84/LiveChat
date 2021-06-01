@@ -1,15 +1,17 @@
 import React, {Component} from "react";
-import LiveChat from "./LiveChat";
+import Chat from "./Chat";
 import "./styles/numbers.css";
 
 class Numbers extends Component {
+  constructor(props) {
+    super(props);
 
-  lc = new LiveChat();
-  state = {
-    numbersList: [],
-    messages: [],
-    connectedCell: '',
-  };
+    this.state = {
+      numbersList: [],
+      messages: [],
+      connectedCell: '',
+    };
+  }
 
   componentDidMount() {
     this.getNumbers();
@@ -44,7 +46,7 @@ class Numbers extends Component {
     this.state.messages = await this.get(url);
     this.setState({messages: this.state.messages.map((message) => message['message'])});
 
-    this.lc.loadChatRoom(number, this.state.messages);
+    Chat.loadChatRoom(number, this.state.messages);
     this.setState({connectedCell: number});
   }
 

@@ -7,7 +7,7 @@ import json, pytest
 @pytest.mark.django_db
 async def test_general_consumer():
     communicator = WebsocketCommunicator(GeneralChatConsumer, path="/chat/general")
-    connected, subprotocol = await communicator.connect()
+    connected, _ = await communicator.connect()
     assert connected
 
     send_msg = {"message":"test message"}

@@ -1,17 +1,16 @@
-import json, websocket, asyncio, channels.layers, django.http.request as request
+import json, asyncio, channels.layers, django.http.request as request
 from rest_framework import response, status, views, generics
 from ..models import *
 from ..serializers import *
 from django.shortcuts import render
 from asgiref.sync import async_to_sync
-from ..consumers import ChatConsumer
-from ..controllers import main
+from ..controllers.main import ws_url, twilio_controller as tc, google_transcribe_speech
+from ..controllers.twilio import twilio_database_routine
 from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from twilio.twiml.voice_response import VoiceResponse, Connect, Stream
-from twilio.request_validator import RequestValidator
 
 class UserRegistration(views.APIView):
     def post(self, request: request.HttpRequest, format='json') -> response.Response:
@@ -64,56 +63,46 @@ class GetMessages(generics.ListAPIView):
 def index(request: request.HttpRequest):
     return render(request, 'index.html')
 
-#TODO: update to send using asgiref.sync.async_to_sync instead of websocket client
 @csrf_exempt
 def sms(request: request.HttpRequest):
     text = request.POST.get("Body")
-    from_number = request.POST.get("From")
+    from_number = request.POST.get("From").strip('+')
+    sid = request.POST.get("MessageSid")
 
-    # text = text.split(":")
-    message: dict = dict()
-    try:
-        # room_name = text[0].strip(' ')
-        message = {"message":text}
-        # message['sms'] = True
-        from_number = from_number.strip('+')
-        caller = Caller.objects.get(number=from_number)
-        if caller is None:
-            caller = Caller(
-            number=from_number, 
-            country=request.POST.get("FromCountry"),
-            city=request.POST.get("FromCity"),
-            state=request.POST.get("FromState")).save()
+    # message: dict = dict()
+    # try:
+    channel_layer = channels.layers.get_channel_layer()
+    async_to_sync(channel_layer.group_send)(f"chat_{from_number}", {"type": "chat_message", "message": text})
 
+    async_to_sync(twilio_database_routine)(number=from_number, call_sid=sid, msg_type='S', message=text)
         # caller = Caller.objects.get(number=from_number)
-        sid = request.POST.get("MessageSid")
-        Call(sid=sid,length_of_call=0,caller_id=caller.id).save()
-        call = Call.objects.get(sid=sid)
+        # if caller is None:
+        #     caller = Caller(
+        #     number=from_number, 
+        #     country=request.POST.get("FromCountry"),
+        #     city=request.POST.get("FromCity"),
+        #     state=request.POST.get("FromState")).save()
 
-        #TODO: Create a generalized function for this which allows for injection to different sources. i.e. a remote source that requires authentication
-        channel_layer = channels.layers.get_channel_layer()
-        async_to_sync(channel_layer.group_send)(f"chat_{from_number}", {"type": "chat_message", "message": message})
-        # ws = websocket.WebSocket()
-        # ws.connect(f"ws://localhost/ws/chat/{from_number}/")
-        # ws.send(json.dumps(message))
-        # ws.close()
-        message["Success"] = True
-    except BaseException as e:
-        print(e)
-        message = {"Error":e}
+        # Call(sid=sid,length_of_call=0,caller_id=caller.id).save()
+        # call = Call.objects.get(sid=sid)
+
+        # message["Success"] = True
+    # except BaseException as e:
+    #     print(e)
+    #     message = {"Error":e}
     
-    msg = Message(call_id=call.id,number=from_number,message_type="S",message=message['message']).save()
+    # Message(call_id=call.id,number=from_number,message_type="S",message=message['message']).save()
 
-    return HttpResponse(json.dumps(message))
+    return HttpResponse(json.dumps({"Success": True}))
 
 @csrf_exempt
 #TODO: configure Twilio security using the Twilio signature
 #TODO: configure a 404 not found or rejected HttpResponse on error
 def voice(request: request.HttpRequest):
     try:
-        twilio_signature = request.META['HTTP_X_TWILIO_SIGNATURE']
+        _ = request.META['HTTP_X_TWILIO_SIGNATURE']
         resp = VoiceResponse()
-        with resp.gather(num_digits=1, action="/chat/menu/", method="POST", timeout=3) as gather:
+        with resp.gather(num_digits=1, action="/api/menu/", method="POST", timeout=3) as gather:
             gather.say(message="Press 1 to record a message or press 2 stream the voice call.", loop=1)
     
         return HttpResponse(str(resp))
@@ -123,29 +112,27 @@ def voice(request: request.HttpRequest):
 @csrf_exempt
 def menu(request: request.HttpRequest):
     try:
-        twilio_signature = request.META['HTTP_X_TWILIO_SIGNATURE']
+        _ = request.META['HTTP_X_TWILIO_SIGNATURE']
         digit = request.POST.get('Digits')
+        from_number = request.POST.get("From")
 
         resp = VoiceResponse()
         #record
         if digit == '1':
             resp.say("Please leave a message. Press the pound or hash key to end the recording.")
-            #without an action or recording_status_callbath attribute then you will have an endless loop of calling into the view
-            resp.record(play_beep=True, max_length=30, finish_on_key="#", recording_status_callback="/chat/record/", action="/chat/hangup/")
+            #without an action or recording_status_callback attribute then you will have an endless loop of calling into the view
+            resp.record(play_beep=True, max_length=30, finish_on_key="#", recording_status_callback="/api/record/", action="/api/hangup/")
 
             channel_layer = channels.layers.get_channel_layer()
-            async_to_sync(channel_layer.group_send)("chat_lobby", {
-                "type": "chat_message",
-                "message": 'Incoming recording...'
-            })
+            async_to_sync(channel_layer.group_send)(f"chat_{from_number.strip('+')}", {"type": "chat_message", "message": 'Incoming recording...'}) 
         elif digit == '2':
             resp.say("Please begin speaking...")
             connect = Connect()
-            connect.stream(url=main.ws_url)
+            connect.stream(url=ws_url)
             resp.append(connect)
         else:
             resp.say("Incorrect entry. Please try again.")
-            resp.redirect('/chat/voice/')
+            resp.redirect('/api/voice/')
         
         return HttpResponse(str(resp))
     except KeyError:
@@ -153,25 +140,21 @@ def menu(request: request.HttpRequest):
             
 
 @csrf_exempt
-#TODO: configure the recording as an asynchronous thread
 def record(request: request.HttpRequest):
     try:
-        twilio_signature = request.META['HTTP_X_TWILIO_SIGNATURE']
+        _ = request.META['HTTP_X_TWILIO_SIGNATURE']
         call_sid = request.POST.get("CallSid")
-        
-        tc = main.twilio_controller()
+
+        from_number = tc.get_call_info(sid=call_sid).from_
+        transcribe_speech = google_transcribe_speech()
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.run_until_complete(tc.connect(destination="twilio"))
-        caller = loop.run_until_complete(tc.get_call_info(call_sid=call_sid).from_formatted)
-
-        transcribe_speech = main.google_transcribe_speech()
+        loop.run_until_complete(transcribe_speech.connect(destination="speech"))
         transcript = transcribe_speech.download_audio_and_transcribe(recording_url=request.POST.get("RecordingUrl"))
         channel_layer = channels.layers.get_channel_layer()
-        async_to_sync(channel_layer.group_send)("chat_lobby", {
-            "type": "chat_message",
-            "message": f'{caller} - {transcript}'
-        })
+        async_to_sync(channel_layer.group_send)(f"chat_{from_number.strip('+')}", {"type": "chat_message","message": transcript})
+
+        async_to_sync(twilio_database_routine)(number=from_number.strip('+'), call_sid=call_sid, msg_type='R', message=transcript)
         return HttpResponse()
     except KeyError:
         return
@@ -179,7 +162,7 @@ def record(request: request.HttpRequest):
 @csrf_exempt
 def hangup(request: request.HttpRequest):
     try:
-        twilio_signature = request.META['HTTP_X_TWILIO_SIGNATURE']
+        _ = request.META['HTTP_X_TWILIO_SIGNATURE']
         resp = VoiceResponse()
         resp.hangup()
 

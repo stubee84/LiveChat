@@ -1,3 +1,4 @@
+import re
 import twilio.rest, os, asyncio, requests, json, google.auth, threading, queue, channels.layers, io, ffmpeg, base64, hashlib
 import google.auth.transport.requests as tr_requests
 from asgiref.sync import async_to_sync
@@ -69,8 +70,8 @@ class google_transcribe_speech:
         self.stream_queue: queue.Queue = None
         self.stream_finished: bool = False
         self.transport: tr_requests.AuthorizedSession = None
-        self.bucket_name: str = os.environ.get("GOOGLE_CLOUD_STORAGE_BUCKET_NAME")
-        self.upload_url: str = u'https://www.googleapis.com/upload/storage/v1/b/{bucket}/o?uploadType=resumable'.format(bucket=bucket_name)
+        # self.bucket_name: str = os.environ.get("GOOGLE_CLOUD_STORAGE_BUCKET_NAME")
+        # self.upload_url: str = u'https://www.googleapis.com/upload/storage/v1/b/{bucket}/o?uploadType=resumable'.format(bucket=self.bucket_name)
         self.wr_scope: str = u'https://www.googleapis.com/auth/devstorage.read_write'
 
     async def connect(self, **kwargs):
@@ -202,38 +203,29 @@ class google_transcribe_speech:
                 # The alternatives are ordered from most likely to least.
                 for alternative in alternatives:
                     # print("Confidence: {}".format(alternative.confidence))
-                    transcription = u"Transcript: {}".format(alternative.transcript)
+                    transcription = u"Recording: {}".format(alternative.transcript)
 
         return transcription
 
 class twilio_controller:
     sid = os.environ.get("TWILIO_ACCOUNT_SID")
     token = os.environ.get("TWILIO_AUTH_TOKEN")
-    
-    def __init__(self):
-    #Rest client variable. Maybe call this rest_clients
-        self.twilio_client: twilio.rest.Client = twilio.rest.Client(username=self.sid,password=self.token)
-    
-    # async def connect(self, **kwargs):
-    #     try:
-    #         if kwargs['destination'].lower() == "twilio":
-    #             await self.twilio_connect(sid=sid,token=token)
-    #     except KeyError:
-    #         return
-
-    # #Maybe: put these two functitons into their own twilio child class
-    # async def twilio_connect(self, sid: str, token: str):
-    #     if self.twilio_client is None:
-    #         self.twilio_client = twilio.rest.Client(username=sid,password=token)
+    twilio_client: twilio.rest.Client = twilio.rest.Client(username=sid,password=token)
+    call_sid: str = None
+    number: str = None
         
-    async def twilio_send_message(self, to_number: str, body: str, from_number: str = phone_number) -> bool:
-        result = self.twilio_client.messages.create(to=to_number,from_=from_number,body=body)
+    @classmethod
+    async def twilio_send_message(cls, to_number: str, body: str, from_number: str = phone_number) -> object:
+        message = cls.twilio_client.messages.create(to=to_number,from_=from_number,body=body)
         #TODO: possibly change this to query the URI for status once it has been sent or received
-        if result._properties["status"] == "queued":
-            return True
-        return False
+        if message._properties["status"] == "queued":
+            cls.call_sid = message.sid
+            cls.number = message.to
+            return cls
+        return None
 
-    async def twilio_call_with_recording(self, to_number: str, body: str, from_number: str = phone_number) -> bool:
+    @classmethod
+    async def twilio_call_with_recording(cls, to_number: str, body: str, from_number: str = phone_number) -> object:
         twiml = f'''<Response>
             <Say>
                 {body}
@@ -241,16 +233,25 @@ class twilio_controller:
         </Response>'''
         
         try:
-            result = self.twilio_client.calls.create(to=to_number, from_=from_number, twiml=twiml)
+            call = cls.twilio_client.calls.create(to=to_number, from_=from_number, twiml=twiml)
+            cls.call_sid = call.sid
+            cls.number = call.to
         except twilio.base.exceptions.TwilioException as e:
             print(e)
-            return False
+            return None
 
-        print(result._properties)
-        return True
+        print(call._properties)
+        return cls
 
-    async def get_call_info(self, call_sid: str) -> str:
-        return self.twilio_client.calls(call_sid).fetch()
+    @classmethod
+    def get_call_info(cls, sid: str):
+        if sid.find('SM') == -1:
+            return cls.twilio_client.calls(sid).fetch()
+        return cls.twilio_client.messages(sid).fetch()
+
+    @classmethod
+    def get_caller_info(cls, number: str):
+        return cls.twilio_client.lookups.v1.phone_numbers(number).fetch()
 
 class password_management():
     def __init__(self, password: str):

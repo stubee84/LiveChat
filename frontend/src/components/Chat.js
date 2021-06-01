@@ -1,74 +1,60 @@
 import React, {Component} from "react";
+import WS from "./WebSocket";
 import "./styles/livechat.css"
 
-class LiveChat extends Component {
+class Chat extends Component {
     constructor(props) {
         super(props);
 
-        this.ws = new WebSocket(
-            'ws://'
-            + window.location.host
-            + '/ws/chat/'
-            + 'general/'
-        );
-
-        this.receive()
+        WS.setWebSocket("general");
+        Chat.receive();
     }
-
     componentDidMount() {
         document.querySelector('#chat-message-input').focus();
     }
 
-    receive() {
-        this.ws.onmessage = message => {
-            var data = JSON.parse(message.data);
-            document.querySelector('#chat-log').value += (data.message + '\n');
-        }
-    }
-
-    loadChatRoom(number, messages) {
-        this.initWebSocket(number);
+    static loadChatRoom(number, messages) {
+        WS.setWebSocket(number);
 
         document.querySelector("#chat-log").value = '';
         messages.map((message) => {
             document.querySelector("#chat-log").value += (message + '\n');
-        })
+        });
+        this.receive();
     }
 
-    initWebSocket(number) {
-        //check to keep number of open websocket connections to 1
-        if (this.ws.readyState === this.ws.OPEN) {
-            console.log("closing connection to socket: "+ this.ws.url)
-            this.ws.close();
-        }
-
-        this.ws = new WebSocket(
-            'ws://'
-            + window.location.host
-            + '/ws/chat/'
-            + number + '/'
-        );
-        console.log("successfully connected to " + this.ws.url);
-        
-        this.receive();
+    static receive() {
+        WS.receive(message => {
+            var data = JSON.parse(message.data);
+            document.querySelector('#chat-log').value += (data + '\n');
+        });
     }
 
     send(key) {
         if (key === 'Enter' || key === 0) {
             var text = document.querySelector("#chat-message-input").value;
             var type = document.querySelector("#chat-message-destination").value;
-            
+
             var msg = {
                 "message": text,
-                "type": type,
-                "stream": "False"
             };
-            this.ws.send(JSON.stringify(msg));
+            switch(type) {
+                case "outbound_call":
+                    msg['call'] = true;
+                case "live_outbound_text_to_speech":
+                    msg['stream'] = true;
+                case "sms":
+                    msg['sms'] = true;
+                default:
+                    msg['chat'] = true;
+            }
+            
+            WS.send(msg);
 
             document.querySelector("#chat-message-input").value = "";
         }
     }
-    
+   
     render () {
         return (
             <div id="dashboard-chat-container">
@@ -81,9 +67,7 @@ class LiveChat extends Component {
                         <select id="chat-message-destination">
                             <option value="chat">Chat</option>
                             <option value="sms">SMS</option>
-                            <option value="inbound_record_call">Inbound Recorded Call</option>
-                            <option value="outbound_text_call">Outbound Text Call</option>
-                            <option value="live_inbound_transcription">Live Inbound Transcription</option>
+                            <option value="outbound_call">Outbound Call</option>
                             <option value="live_outbound_text_to_speech">Live outbound text to speech</option>
                         </select>
                     </div>
@@ -99,4 +83,4 @@ class LiveChat extends Component {
     }
 }
 
-export default LiveChat;
+export default Chat;
