@@ -1,6 +1,7 @@
 from channels.testing import WebsocketCommunicator
-from ..consumers import GeneralChatConsumer, fetch
+from ..consumers import GeneralChatConsumer
 from ..models import Message
+from ..controllers.main import database_routines as dr
 import json, pytest
 
 @pytest.mark.asyncio
@@ -18,5 +19,5 @@ async def test_general_consumer():
 
     await communicator.disconnect()
 
-    msg_saved = await fetch(model=Message, message=send_msg['message'], message_type='C')
+    msg_saved = await dr.fetch(model=Message, message=send_msg['message'], message_type='C')
     assert send_msg['message'] == msg_saved.message

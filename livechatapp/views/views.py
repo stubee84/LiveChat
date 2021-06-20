@@ -1,16 +1,17 @@
-import json, asyncio, channels.layers, django.http.request as request
+import json, asyncio, channels.layers, django.http.request as request, redis
 from rest_framework import response, status, views, generics
 from ..models import *
 from ..serializers import *
 from django.shortcuts import render
 from asgiref.sync import async_to_sync
-from ..controllers.main import ws_url, twilio_controller as tc, google_transcribe_speech
+from ..controllers.main import ws_url, twilio_controller as tc, google_transcribe_speech, database_routines as dr
 from ..controllers.twilio import twilio_database_routine
+from ..controllers.redis_controller import redisController
 from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
-from twilio.twiml.voice_response import VoiceResponse, Connect, Stream
+from twilio.twiml.voice_response import VoiceResponse, Connect
 
 class UserRegistration(views.APIView):
     def post(self, request: request.HttpRequest, format='json') -> response.Response:
@@ -69,29 +70,10 @@ def sms(request: request.HttpRequest):
     from_number = request.POST.get("From").strip('+')
     sid = request.POST.get("MessageSid")
 
-    # message: dict = dict()
-    # try:
     channel_layer = channels.layers.get_channel_layer()
     async_to_sync(channel_layer.group_send)(f"chat_{from_number}", {"type": "chat_message", "message": text})
 
-    async_to_sync(twilio_database_routine)(number=from_number, call_sid=sid, msg_type='S', message=text)
-        # caller = Caller.objects.get(number=from_number)
-        # if caller is None:
-        #     caller = Caller(
-        #     number=from_number, 
-        #     country=request.POST.get("FromCountry"),
-        #     city=request.POST.get("FromCity"),
-        #     state=request.POST.get("FromState")).save()
-
-        # Call(sid=sid,length_of_call=0,caller_id=caller.id).save()
-        # call = Call.objects.get(sid=sid)
-
-        # message["Success"] = True
-    # except BaseException as e:
-    #     print(e)
-    #     message = {"Error":e}
-    
-    # Message(call_id=call.id,number=from_number,message_type="S",message=message['message']).save()
+    async_to_sync(twilio_database_routine)(number=from_number, call_sid=sid, call_type='S', msg_type='S', message=text)
 
     return HttpResponse(json.dumps({"Success": True}))
 
@@ -114,8 +96,10 @@ def menu(request: request.HttpRequest):
     try:
         _ = request.META['HTTP_X_TWILIO_SIGNATURE']
         digit = request.POST.get('Digits')
-        from_number = request.POST.get("From")
+        from_number = request.POST.get("From").strip("+")
+        call_sid = request.POST.get("CallSid")
 
+        channel_layer = channels.layers.get_channel_layer()
         resp = VoiceResponse()
         #record
         if digit == '1':
@@ -123,9 +107,15 @@ def menu(request: request.HttpRequest):
             #without an action or recording_status_callback attribute then you will have an endless loop of calling into the view
             resp.record(play_beep=True, max_length=30, finish_on_key="#", recording_status_callback="/api/record/", action="/api/hangup/")
 
-            channel_layer = channels.layers.get_channel_layer()
-            async_to_sync(channel_layer.group_send)(f"chat_{from_number.strip('+')}", {"type": "chat_message", "message": 'Incoming recording...'}) 
+            async_to_sync(channel_layer.group_send)(f"chat_{from_number}", {"type": "chat_message", "message": 'Incoming recording...'}) 
+        #stream
         elif digit == '2':
+            caller: Caller = Caller.objects.get(number=from_number)
+            Call.save(sid=call_sid, length_of_call=0, caller_id=caller.id, call_type="L")
+            redisController.set(key=call_sid,value=from_number)
+
+            async_to_sync(channel_layer.group_send)(f"chat_{from_number}", {"type": "chat_message", "stream": True, "message": 'Incoming stream...'})
+
             resp.say("Please begin speaking...")
             connect = Connect()
             connect.stream(url=ws_url)
@@ -154,7 +144,7 @@ def record(request: request.HttpRequest):
         channel_layer = channels.layers.get_channel_layer()
         async_to_sync(channel_layer.group_send)(f"chat_{from_number.strip('+')}", {"type": "chat_message","message": transcript})
 
-        async_to_sync(twilio_database_routine)(number=from_number.strip('+'), call_sid=call_sid, msg_type='R', message=transcript)
+        async_to_sync(twilio_database_routine)(number=from_number.strip('+'), call_sid=call_sid, call_type='R', msg_type='R', message=transcript)
         return HttpResponse()
     except KeyError:
         return

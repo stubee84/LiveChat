@@ -16,9 +16,9 @@ class Chat extends Component {
     static loadChatRoom(number, messages) {
         WS.setWebSocket(number);
 
-        document.querySelector("#chat-log").value = '';
+        document.querySelector("#chat-text-log").value = '';
         messages.map((message) => {
-            document.querySelector("#chat-log").value += (message + '\n');
+            document.querySelector("#chat-text-log").value += (message + '\n');
         });
         this.receive();
     }
@@ -26,7 +26,12 @@ class Chat extends Component {
     static receive() {
         WS.receive(message => {
             var data = JSON.parse(message.data);
-            document.querySelector('#chat-log').value += (data + '\n');
+
+            if ('stream' in data) {
+                document.querySelector('#chat-stream-log').value += (data.message + '\n');
+            } else {
+                document.querySelector('#chat-text-log').value += (data + '\n');
+            }
         });
     }
 
@@ -41,12 +46,13 @@ class Chat extends Component {
             switch(type) {
                 case "outbound_call":
                     msg['call'] = true;
+                    break;
                 case "live_outbound_text_to_speech":
                     msg['stream'] = true;
+                    break;
                 case "sms":
                     msg['sms'] = true;
-                default:
-                    msg['chat'] = true;
+                    break;
             }
             
             WS.send(msg);
@@ -59,8 +65,13 @@ class Chat extends Component {
         return (
             <div id="dashboard-chat-container">
                 <h2 id="chat-window">Chat</h2>
+                <div id="chat-stream-container">
+                    <h3 id="chat-stream-window">Stream</h3>
+                    <textarea id="chat-stream-log" cols="100" rows="2"></textarea>
+                </div>
                 <div id="chat-text-container">
-                    <textarea id="chat-log" cols="100" rows="20"></textarea>
+                    <h3 id="chat-text-window">Text</h3>
+                    <textarea id="chat-text-log" cols="100" rows="20"></textarea>
                 </div>
                 <div id="chat-input-container">
                     <div id="input-destination">

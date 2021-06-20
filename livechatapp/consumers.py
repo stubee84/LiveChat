@@ -1,23 +1,8 @@
-# chat/consumers.py
-import json, re, base64, sys
-
-# from twilio.twiml.voice_response import Numbers
-# from django.utils.functional import LazyObject
-from .controllers.main import twilio_controller as tc, google_transcribe_speech, google_text_to_speech
+import json, base64, sys
+from .controllers.main import twilio_controller as tc, google_transcribe_speech, google_text_to_speech, database_routines as dr
 from .controllers.twilio import twilio_database_routine
 from channels.generic.websocket import AsyncWebsocketConsumer, WebsocketConsumer
-from channels.db import database_sync_to_async
-from .models import Caller, Message, Call
-
-num_reg = re.compile(r'.*:(\d{10}|\d{11}|(\+\d{11})):.*')
-
-@database_sync_to_async
-def insert(model, **attrs):
-    model(**attrs).save(force_insert=True)
-
-@database_sync_to_async
-def fetch(model, **attrs):
-    return model.objects.get(**attrs)
+from .models import Message
 
 class DefaultUrl(WebsocketConsumer):
     def connect(self):
@@ -39,7 +24,7 @@ class GeneralChatConsumer(AsyncWebsocketConsumer):
         text_data_json = json.loads(text_data)
         message = text_data_json['message']
 
-        await insert(model=Message, message=message, message_type="C")
+        await dr.insert(model=Message, message=message, message_type="C")
 
         await self.channel_layer.group_send(
             self.room_group_name,
@@ -50,12 +35,7 @@ class GeneralChatConsumer(AsyncWebsocketConsumer):
         )
         
     async def chat_message(self, event):
-        message = event['message']
-
-        text = json.dumps({
-            'message': message
-        })
-        await self.send(text_data=text)
+        await self.send(text_data=json.dumps(event['message']))
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -83,7 +63,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
         message = text_data_json['message']
         msg_type = 'C'
 
-        print(text_data_json)
         if 'stream' in text_data_json:
             text_to_speech = google_text_to_speech()
             out_bytes = await text_to_speech.transcribe_text(text=message)
@@ -99,11 +78,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 callable = tc.twilio_call_with_recording
                 msg_type = 'O'
     
-            obj = await callable(to_number=self.room_name, body=message)
-            if obj is None:
-                print("Failed to send message. {}".format(message))
-                return
-
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -111,8 +85,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     'message': message
                 }
             )
+            obj = await callable(to_number=self.room_name, body=message)
+            if obj is None:
+                print("Failed to send message. {}".format(message))
+                return
 
-        await twilio_database_routine(number=obj.number.strip('+'), call_sid=obj.call_sid, msg_type=msg_type, message=message)
+
+            await twilio_database_routine(number=obj.number.strip('+'), call_sid=obj.call_sid, msg_type=msg_type, message=message)
 
         # matches = num_reg.match(message)
         # if matches is not None:
@@ -156,10 +135,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
         message = event['message']
         
         try:
-            stream = event['stream']
             text = json.dumps({
                 'message': message,
-                'stream': stream
+                'stream': event['stream']
             })
         except KeyError:
             text = message
@@ -171,7 +149,6 @@ class StreamConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         await self.accept()
         self.transcribe_speech = google_transcribe_speech()
-        await self.transcribe_speech.start_transcriptions_stream()
 
     async def disconnect(self, close_code):
         pass
@@ -184,18 +161,9 @@ class StreamConsumer(AsyncWebsocketConsumer):
         data = json.loads(text_data)
         if data['event'] == "start":
             print(f"Media WS: Received event '{data['event']}': {text_data}")
-            await self.channel_layer.group_add(
-                data["streamSid"],
-                self.channel_name
-            )
+            await self.channel_layer.group_add(data["streamSid"],self.channel_name)
+            await self.transcribe_speech.start_transcriptions_stream(call_sid=data["start"]["callSid"])
 
-            await self.channel_layer.group_send(
-                "chat_lobby",
-                {
-                    'type': 'chat_message',
-                    'message': f'Incoming stream from {data["streamSid"]}'
-                }
-            )
         elif data['event'] == "media":
             media = data['media']
             chunk = base64.b64decode(media['payload'])

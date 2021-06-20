@@ -24,6 +24,12 @@ class Call(models.Model):
     sid = models.CharField(max_length=50, unique=True)
     length_of_call = models.IntegerField()
     caller_id = models.IntegerField()
+    CALL_TYPES = (
+        ('S', 'SMS'),
+        ('R', 'Recording'),
+        ('L', 'Live'),
+    )
+    call_type = models.CharField(max_length=1, choices=CALL_TYPES)
 
 class Message(models.Model):
     id = models.ObjectIdField()

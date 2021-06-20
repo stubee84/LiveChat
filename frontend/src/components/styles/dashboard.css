@@ -1,0 +1,17 @@
+.numbers-container {
+    grid-area: left;
+}
+
+.chat-container {
+    grid-area: mid;
+}
+
+.logout-container {
+    grid-area: right;
+}
+
+.dashboard-container {
+    display: grid;
+    grid-template-columns: 10% 85% 5%;
+    grid-template-areas: "left mid right";
+}

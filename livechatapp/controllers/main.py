@@ -1,7 +1,8 @@
-import re
-import twilio.rest, os, asyncio, requests, json, google.auth, threading, queue, channels.layers, io, ffmpeg, base64, hashlib
+import twilio.rest, os, requests, json, google.auth, threading, queue, channels.layers, ffmpeg, base64, sys
 import google.auth.transport.requests as tr_requests
+from .redis_controller import redisController
 from asgiref.sync import async_to_sync
+from channels.db import database_sync_to_async
 from dotenv import load_dotenv
 from google.cloud import storage, speech, texttospeech
 from google.resumable_media.requests import ResumableUpload
@@ -10,12 +11,20 @@ from django.contrib.auth.hashers import PBKDF2PasswordHasher
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(dotenv_path=dotenv_path)
 
-# sid = os.environ.get("TWILIO_ACCOUNT_SID")
-# token = os.environ.get("TWILIO_AUTH_TOKEN")
-phone_number = os.environ.get("TWILIO_NUMBER")
 ws_url = os.environ.get("WEBSOCKET_URL")
 twilio_url = "https://api.twilio.com/"
 salt = os.environ.get("SALT")
+
+class database_routines:
+    @database_sync_to_async
+    @staticmethod
+    def insert(model, **attrs):
+        model(**attrs).save(force_insert=True)
+
+    @database_sync_to_async
+    @staticmethod
+    def fetch(model, **attrs):
+        return model.objects.get(**attrs)
 
 class google_text_to_speech:
     def __init__(self):
@@ -89,7 +98,8 @@ class google_transcribe_speech:
             print(e)
             return
         
-    async def start_transcriptions_stream(self):
+    async def start_transcriptions_stream(self, call_sid: str):
+        from_number = redisController.get(key=call_sid)
         await self.connect(destination="speech")
         
         config = speech.RecognitionConfig(
@@ -100,7 +110,7 @@ class google_transcribe_speech:
         streaming_config = speech.StreamingRecognitionConfig(config=config, interim_results=True)
 
         self.stream_queue = queue.Queue()
-        thread = threading.Thread(target=self.send_to_google, args=(streaming_config,))
+        thread = threading.Thread(target=self.send_to_google, args=(streaming_config,from_number,))
         thread.start()
     
     async def end_stream(self):
@@ -116,15 +126,15 @@ class google_transcribe_speech:
             yield self.stream_queue.get()
 
     #run in its own thread space
-    def send_to_google(self, streaming_config: speech.StreamingRecognitionConfig):
+    def send_to_google(self, streaming_config: speech.StreamingRecognitionConfig, from_number: str):
         channel_layer = channels.layers.get_channel_layer()
         #start the streaming recognition and block, using the queue, until data becomes available
         for response in self.speech_client.streaming_recognize(config=streaming_config, requests=self.get_req_from_queue(),):
-            self.print_transcription_response(response, channel_layer)
+            self.print_transcription_response(response, channel_layer, from_number)
             if self.stream_finished:
                 return
         
-    def print_transcription_response(self, response, channel_layer):
+    def print_transcription_response(self, response, channel_layer, from_number: str):
         if not response.results:
             return
         
@@ -133,7 +143,7 @@ class google_transcribe_speech:
             return
         
         transcription = result.alternatives[0].transcript
-        async_to_sync(channel_layer.group_send)("chat_lobby", {
+        async_to_sync(channel_layer.group_send)(f"chat_{from_number}", {
             "type": "chat_message",
             'stream': True,
             "message": f'{transcription}'
@@ -157,7 +167,7 @@ class google_transcribe_speech:
             while not upload.finished:
                 chunk_resp = upload.transmit_next_chunk(self.transport)
         else:
-            print(resp.status_code)
+            print(gc_resp.status_code)
 
         return 'gs://{bucket_name}/{blob_name}'.format(self.bucket_name, recording_sid)
 
@@ -203,13 +213,14 @@ class google_transcribe_speech:
                 # The alternatives are ordered from most likely to least.
                 for alternative in alternatives:
                     # print("Confidence: {}".format(alternative.confidence))
-                    transcription = u"Recording: {}".format(alternative.transcript)
+                    transcription = u"{}".format(alternative.transcript)
 
         return transcription
 
 class twilio_controller:
     sid = os.environ.get("TWILIO_ACCOUNT_SID")
     token = os.environ.get("TWILIO_AUTH_TOKEN")
+    phone_number = os.environ.get("TWILIO_NUMBER")
     twilio_client: twilio.rest.Client = twilio.rest.Client(username=sid,password=token)
     call_sid: str = None
     number: str = None
@@ -240,7 +251,6 @@ class twilio_controller:
             print(e)
             return None
 
-        print(call._properties)
         return cls
 
     @classmethod

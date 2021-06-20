@@ -2,21 +2,20 @@ import React, {Component} from "react";
 import Chat from "./Chat";
 import Numbers from "./Numbers";
 import Logout from "./Logout";
-// import { render } from "react-dom";
 import "./styles/dashboard.css"
 
 class Dashboard extends Component {
     
     render() {
         return (
-            <div id="dashboard-container">
-                <div id="numbers-container">
+            <div className="dashboard-container">
+                <div className="numbers-container">
                     <Numbers></Numbers>
                 </div>
-                <div id="chat-container">
+                <div className="chat-container">
                     <Chat></Chat>
                 </div>
-                <div id="logout-container">
+                <div className="logout-container">
                     <Logout></Logout>
                 </div>
             </div>
