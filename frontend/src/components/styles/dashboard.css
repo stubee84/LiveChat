@@ -1,4 +1,7 @@
+@import url("normalize.css");
+
 .numbers-container {
+    padding-left: 10%;
     grid-area: left;
 }
 
@@ -11,7 +14,23 @@
 }
 
 .dashboard-container {
+    color: darkslategray;
     display: grid;
-    grid-template-columns: 10% 85% 5%;
+    grid-template-columns: 15% 80% 5%;
     grid-template-areas: "left mid right";
 }
+
+body {
+    background-color: lightgray;
+}
+
+input[type="button"], input[type="submit"] { 
+    padding: 5px 10px;
+    text-align: center;
+    text-decoration: none;
+    white-space: nowrap;
+    background-color: #1d7484;
+    color: #f9f9f9;
+    border-radius: 1px;
+    border: 1px solid #1d7484;
+} 

@@ -1,6 +1,7 @@
 import React, {Component} from "react";
 import Chat from "./Chat";
 import "./styles/numbers.css";
+import cookies from "./Cookies"
 
 class Numbers extends Component {
   constructor(props) {
@@ -11,6 +12,7 @@ class Numbers extends Component {
       messages: [],
       connectedCell: '',
     };
+    this.numReg = new RegExp('^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$')
   }
 
   componentDidMount() {
@@ -29,13 +31,42 @@ class Numbers extends Component {
     document.getElementById(id).style.backgroundColor = (document.getElementById(id).style.backgroundColor == '') ? '#DDDDDD' : '';
 
     return true;
- }
-
- editNumbers() {
-  if (this.state.connectedCell === '') {
   }
-  return
- }
+
+  numberExists(number) {
+    if (document.getElementById(number)) {
+      return true;
+    }
+    return false;
+  }
+
+  async addNumber(event) {
+    if (event.key === 'Enter' || event.keyCode === 13) {
+      var number = document.getElementById("add-number").value;
+
+      if (!this.numReg.test(number)) {
+        alert("invalid number format");
+        return;
+      }
+      if (this.numberExists(number)) {
+        alert("Number already added");
+        return;
+      }
+
+      await this.send("/api/numbers/"+number+"/", "POST");
+      await this.getNumbers();
+    }
+  }
+
+  async removeNumber() {
+    var number = this.state.connectedCell;
+    if (number === '') {
+      alert("select a cell first to remove");
+      return;
+    }
+    await this.send("/api/numbers/"+number+"/", "DELETE");
+    await this.getNumbers();
+  }
 
   async getMessages(number) {
     if (!this.changeColor(number)) {
@@ -43,47 +74,48 @@ class Numbers extends Component {
       return
     }
     var url = "/api/messages/"+number+"/";
-    this.state.messages = await this.get(url);
+    this.state.messages = await this.send(url, "GET");
     this.setState({messages: this.state.messages.map((message) => message['message'])});
 
     Chat.loadChatRoom(number, this.state.messages);
     this.setState({connectedCell: number});
   }
 
-  getNumbers() {
+  async getNumbers() {
     var url = "/api/numbers/";
-    this.get(url).then((result) => {
+    this.send(url, "GET").then((result) => {
       var numbers = result;
       this.setState({numbersList: numbers.map((number) => 
         //in Javascript if I pass just the function then it is called upon creation but if I pass the reference, i.e. () => this.getMessages,
         //then it will be called only after action
         <tr key={number["number"]} onClick={() => this.getMessages(number["number"])}>
-          <td id={number["number"]}>{number['number'] }</td>
+          <td id={number["number"]}>{number['number']}</td>
         </tr>
       )});
     });
   }
 
-  get(url) {
+  send(url, method) {
     var promise = fetch(url, {
-      method: "GET",
+      method: method,
       headers:  {
         'Accept': 'application/json',
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'X-CSRFTOKEN': cookies('csrftoken'),
       },
     }).then(async response => {
       var data = await response.json();
         
       if (!response.ok) {
         var err = (data && data.message) || response.status;
-        console.error(err);
+        alert(data);
         return Promise.reject(err);
       }
-
+      
       return data;
     }).catch(error => {
       console.error(error);
-      return Promise.reject(error);
+      // return Promise.reject(error);
     });
     return promise;
   }
@@ -98,7 +130,19 @@ class Numbers extends Component {
           </tbody>
         </table>
         <br></br>
-        <input onClick={this.editNumbers()} id="edit-numbers-button" type="button" value="Edit"/>
+        <div id="input-destination">
+          <p>
+            <input onKeyUp={e => this.addNumber(e)} type="text" placeholder="Add Number" size="10" id="add-number"/>
+          </p>
+          <p>
+            <input onClick={e => this.removeNumber()} type="button" value="Remove Number" id="remove-number"/>
+          </p>
+          {/* <select id="modify-numbers-table" onChange={() => this.modify()}>
+            <option></option>
+            <option value="add">Add</option>
+            <option value="remove">Remove</option>
+          </select> */}
+        </div>
       </div>
     )
   }

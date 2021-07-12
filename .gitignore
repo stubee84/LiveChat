@@ -14,6 +14,7 @@ livechatapp/migrations/
 livechatapp/controllers/.env
 livechatapp/customization/__pycache__/
 livechatapp/tests/__pycache__/
+livechatapp/views/__pycache__/
 frontend/__pycache__/
 frontend/migrations/
 frontend/node_modules/

@@ -1,3 +1,4 @@
+from logging import error
 import twilio.rest, os, requests, json, google.auth, threading, queue, channels.layers, ffmpeg, base64, sys
 import google.auth.transport.requests as tr_requests
 from .redis_controller import redisController
@@ -6,7 +7,9 @@ from channels.db import database_sync_to_async
 from dotenv import load_dotenv
 from google.cloud import storage, speech, texttospeech
 from google.resumable_media.requests import ResumableUpload
-from django.contrib.auth.hashers import PBKDF2PasswordHasher
+from django.contrib.auth import hashers, password_validation
+from django.core.exceptions import ValidationError
+from typing import Tuple
 
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(dotenv_path=dotenv_path)
@@ -31,7 +34,7 @@ class google_text_to_speech:
         self.text_client: texttospeech.TextToSpeechAsyncClient = texttospeech.TextToSpeechAsyncClient()
         self.channel_layer = channels.layers.get_channel_layer()
     
-    async def transcribe_text(self, text: str) -> bytes:
+    async def transcribe_text(self, text: str) -> Tuple[bytes, error]:
         synthesize_input = texttospeech.SynthesisInput(text=text)
         voice = texttospeech.VoiceSelectionParams(
                 language_code="en-US", ssml_gender=texttospeech.SsmlVoiceGender.FEMALE
@@ -55,7 +58,7 @@ class google_text_to_speech:
             print(e.stderr, file=sys.stderr)
             return bytes(0)
 
-        return out
+        return out, err
 
     async def begin_audio_stream(self, streamSid: str, in_bytes: bytes):
         msg = {
@@ -150,7 +153,7 @@ class google_transcribe_speech:
         })
 
     def download_audio_and_upload(self, recording_sid: str, recording_url: str) -> str:
-        chunk_resp: requests.Response = None
+        # chunk_resp: requests.Response = None
         response = requests.get(url=recording_url, stream=True)
         # filename = f"{recording_sid}.wav"
         content_type = u"audio/wav"
@@ -165,7 +168,7 @@ class google_transcribe_speech:
 
         if gc_resp.status_code == 200:
             while not upload.finished:
-                chunk_resp = upload.transmit_next_chunk(self.transport)
+                _ = upload.transmit_next_chunk(self.transport)
         else:
             print(gc_resp.status_code)
 
@@ -265,16 +268,13 @@ class twilio_controller:
 
 class password_management():
     def __init__(self, password: str):
-        if self.validate_complexity(password):
+        try: 
+            password_validation.validate_password(password)
             self.password = password
             self.salt = salt
+        except ValidationError:
+            raise ValidationError(message={"failure":password_validation.password_validators_help_texts()}, code=500)
 
     def hash(self) -> str:
-        hasher = PBKDF2PasswordHasher()
+        hasher = hashers.PBKDF2PasswordHasher()
         return hasher.encode(password=self.password, salt=self.salt)
-    
-    def validate_complexity(self, password: str) -> bool:
-        return True
-    
-    def verify(pwd1: str, pwd2: str) -> bool:
-        pass

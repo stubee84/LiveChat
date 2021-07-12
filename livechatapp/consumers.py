@@ -1,4 +1,5 @@
 import json, base64, sys
+from livechatapp.controllers.redis_controller import redisController
 from .controllers.main import twilio_controller as tc, google_transcribe_speech, google_text_to_speech, database_routines as dr
 from .controllers.twilio import twilio_database_routine
 from channels.generic.websocket import AsyncWebsocketConsumer, WebsocketConsumer
@@ -56,6 +57,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.room_group_name,
             self.channel_name
         )
+        if hasattr(ChatConsumer, 'stream_sid'):
+            redisController.delete(key=self.room_name)
 
     # Receive message from WebSocket
     async def receive(self, text_data):
@@ -65,11 +68,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         if 'stream' in text_data_json:
             text_to_speech = google_text_to_speech()
-            out_bytes = await text_to_speech.transcribe_text(text=message)
+            out_bytes, err = await text_to_speech.transcribe_text(text=message)
 
             #implement some error handling here
             if sys.getsizeof(out_bytes) != 0:
-                await text_to_speech.begin_audio_stream(streamSid=text_data_json['stream'], in_bytes=out_bytes)
+                if not hasattr(ChatConsumer, 'stream_sid'):
+                    self.stream_sid = redisController.get(key=self.room_name)
+                    print(f"OUTBOUND STREAM SID: {self.stream_sid}")
+                await text_to_speech.begin_audio_stream(streamSid=self.stream_sid, in_bytes=out_bytes)
         else:
             if 'sms' in text_data_json:
                 callable = tc.twilio_send_message
@@ -90,45 +96,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 print("Failed to send message. {}".format(message))
                 return
 
-
-            await twilio_database_routine(number=obj.number.strip('+'), call_sid=obj.call_sid, msg_type=msg_type, message=message)
-
-        # matches = num_reg.match(message)
-        # if matches is not None:
-        #     try:
-        #         to_number = matches.groups()[0]
-        #         text = str(message).split(':')
-        #         method = text[0]
-        #         message = text[len(text)-1].strip()
-            
-        #         tc = twilio_controller()
-        #         await tc.connect(destination="Twilio")
-                
-        #         if method == "text":
-        #             result = await tc.twilio_send_message(to_number=to_number,body=message)
-        #         else:
-        #             result = await tc.twilio_call_with_recording(to_number=to_number,body=message)
-
-        #         if result == False:
-        #             message = "Failed to send message. {}".format(message)
-        #     except IndexError as e:
-        #         message = "Failed to send message. {}".format(e)
-        # else:
-        #     text_to_speech = google_text_to_speech()
-        #     out_bytes = await text_to_speech.transcribe_text(text=message)
-
-        #     #implement some error handling here
-        #     if sys.getsizeof(out_bytes) != 0:
-        #         await text_to_speech.begin_audio_stream(streamSid=stream_sid, in_bytes=out_bytes)
-
-        # # Send message to room group
-        # await self.channel_layer.group_send(
-        #     self.room_group_name,
-        #     {
-        #         'type': 'chat_message',
-        #         'message': message
-        #     }
-        # )
+            await twilio_database_routine(number=obj.number.strip('+'), call_sid=obj.call_sid, call_type=msg_type, msg_type=msg_type, message=message)
 
     # Receive message from room group
     async def chat_message(self, event):
@@ -151,7 +119,11 @@ class StreamConsumer(AsyncWebsocketConsumer):
         self.transcribe_speech = google_transcribe_speech()
 
     async def disconnect(self, close_code):
-        pass
+        await self.channel_layer.group_discard(
+            self.room_group_name,
+            self.channel_name
+        )
+        redisController.delete(key=self.room_group_name)
 
     async def receive(self, text_data):
         if text_data is None:
@@ -161,8 +133,16 @@ class StreamConsumer(AsyncWebsocketConsumer):
         data = json.loads(text_data)
         if data['event'] == "start":
             print(f"Media WS: Received event '{data['event']}': {text_data}")
-            await self.channel_layer.group_add(data["streamSid"],self.channel_name)
-            await self.transcribe_speech.start_transcriptions_stream(call_sid=data["start"]["callSid"])
+
+            call_sid = data['start']['callSid']
+            from_number = redisController.get(key=call_sid)
+            stream_sid = data['streamSid']
+            
+            self.room_group_name = stream_sid
+            await self.channel_layer.group_add(self.room_group_name,self.channel_name)
+
+            redisController.set(key=from_number, value=stream_sid)
+            await self.transcribe_speech.start_transcriptions_stream(call_sid=call_sid)
 
         elif data['event'] == "media":
             media = data['media']
@@ -183,11 +163,18 @@ class StreamConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=event['message'])
 
         msg = json.loads(event['message'])
+        try:
+            mark_num = int(redisController.get(key=msg['streamSid']))
+            mark_num += 1
+        except:
+            mark_num = 1
+        redisController.set(key=msg['streamSid'], value=str(mark_num))
+
         mark = json.dumps({
             "event": "mark",
             "streamSid": msg["streamSid"],
             "mark": {
-                "name": "message 1"
+                "name": f"message {mark_num}"
             }
         })
         await self.send(text_data=mark)

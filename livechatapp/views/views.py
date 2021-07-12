@@ -1,27 +1,45 @@
-import json, asyncio, channels.layers, django.http.request as request, redis
+import json, asyncio, channels.layers, django.http.request as request
 from rest_framework import response, status, views, generics
+from twilio.rest.api.v2010.account import call
 from ..models import *
 from ..serializers import *
 from django.shortcuts import render
 from asgiref.sync import async_to_sync
-from ..controllers.main import ws_url, twilio_controller as tc, google_transcribe_speech, database_routines as dr
+from ..controllers.main import ws_url, twilio_controller as tc, google_transcribe_speech
 from ..controllers.twilio import twilio_database_routine
 from ..controllers.redis_controller import redisController
 from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from django.utils.decorators import method_decorator
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth import login, decorators
 from django.http import HttpResponse
 from twilio.twiml.voice_response import VoiceResponse, Connect
+
+def extract_values_from_error(err: dict) -> str:
+    items = str()
+    for v in err.values():
+        items += ' '.join(v) + ' '
+
+    return items.strip(", ")
+
+all_decorators = [decorators.login_required, csrf_protect]
 
 class UserRegistration(views.APIView):
     def post(self, request: request.HttpRequest, format='json') -> response.Response:
         serializer = RegistrationSerializer(data=request.data)
         
-        if serializer.is_valid():
-            user: User = serializer.create(validated_data=request.data)
-            if user:
-                return response.Response(data=serializer.data, status=status.HTTP_201_CREATED)
-        return response.Response(status=status.HTTP_400_BAD_REQUEST)
+        try:
+            if serializer.is_valid(raise_exception=True):
+                user: User = serializer.create(validated_data=request.data)
+                if user:
+                    return response.Response(data=serializer.data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            try:
+                msg = extract_values_from_error(e.detail)
+                code = e.status_code
+            except AttributeError:
+                msg = extract_values_from_error(e.message_dict)
+                code = status.HTTP_400_BAD_REQUEST
+        return response.Response(data=msg, status=code)
 
 @method_decorator(csrf_protect, name="post")
 class UserLogin(generics.CreateAPIView):
@@ -45,14 +63,54 @@ class UserLogin(generics.CreateAPIView):
             print(f'error: {err}')
             return response.Response(status=status.HTTP_400_BAD_REQUEST)
 
-@method_decorator(login_required, name="get")
-@method_decorator(csrf_protect, name="get")
-class GetNumbers(generics.ListAPIView):
-    queryset = Caller.objects.values('number')
-    serializer_class: NumberSerializer = NumberSerializer
+@method_decorator(all_decorators, name="get")
+@method_decorator(all_decorators, name="post")
+@method_decorator(all_decorators, name="delete")
+class GetNumbers(generics.ListCreateAPIView, generics.DestroyAPIView):
+    def get_serializer_class(self):    
+        if self.request.method == "POST":
+            return CallerSerializer
+        return NumberSerializer
+    
+    def get_queryset(self):
+        if self.request.method == "DELETE":
+            self.lookup_field = "number"
+            return Caller.objects.filter(number=self.number)
+        return Caller.objects.values('number')
 
-@method_decorator(login_required, name="get")
-@method_decorator(csrf_protect, name="get")
+    def post(self, request: request.HttpRequest, *args, **kwargs):
+        self.number: str = request.path.strip('/').split('/')[-1]
+        caller = tc.get_caller_info(number=self.number)
+        caller = {"number": self.number, "country": caller.country_code}
+
+        data, code = None, status.HTTP_400_BAD_REQUEST
+        serializer: CallerSerializer = self.get_serializer(data=caller)
+        try:
+            serializer.is_valid(raise_exception=True)
+            added = serializer.create(validated_data=caller)
+
+            if added:
+                data = serializer.data
+                code = status.HTTP_201_CREATED
+        except BaseException as e:
+            data = f"Failed to create number: {self.number}. Reason: {e}"
+            print(data)
+        return response.Response(data=data, status=code)
+    
+    def delete(self, request: request.HttpRequest, *args, **kwargs):
+        self.number: str = request.path.strip('/').split('/')[-1]
+        serializer: NumberSerializer = self.get_serializer(data={"number":self.number})
+
+        data, code = None, status.HTTP_400_BAD_REQUEST
+        try:
+            serializer.is_valid(raise_exception=True)
+            return super().delete(request, *args, **kwargs)
+        except BaseException as e:
+            data = f"Failed to remove number: {self.number}. Reason: {e}"
+            print(data)
+        return response.Response(data=data, status=code)
+
+@method_decorator(all_decorators, name="get")
 class GetMessages(generics.ListAPIView):
     serializer_class: MessageSerializer = MessageSerializer
 
@@ -60,7 +118,7 @@ class GetMessages(generics.ListAPIView):
         num = self.kwargs['number']
         return Message.objects.filter(number=num)
 
-@login_required
+@decorators.login_required
 def index(request: request.HttpRequest):
     return render(request, 'index.html')
 
@@ -111,7 +169,7 @@ def menu(request: request.HttpRequest):
         #stream
         elif digit == '2':
             caller: Caller = Caller.objects.get(number=from_number)
-            Call.save(sid=call_sid, length_of_call=0, caller_id=caller.id, call_type="L")
+            Call(sid=call_sid, length_of_call=0, caller_id=caller.id, call_type="L").save()
             redisController.set(key=call_sid,value=from_number)
 
             async_to_sync(channel_layer.group_send)(f"chat_{from_number}", {"type": "chat_message", "stream": True, "message": 'Incoming stream...'})
@@ -160,7 +218,7 @@ def hangup(request: request.HttpRequest):
     except KeyError:
         return
 
-@login_required
+@decorators.login_required
 def room(request: request.HttpRequest, room_name):
     return render(request, 'room.html', {
         'room_name': room_name

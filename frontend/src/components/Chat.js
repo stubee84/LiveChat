@@ -2,6 +2,15 @@ import React, {Component} from "react";
 import WS from "./WebSocket";
 import "./styles/livechat.css"
 
+function checkJson(obj) {
+    try {
+        JSON.parse(obj);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 class Chat extends Component {
     constructor(props) {
         super(props);
@@ -27,8 +36,9 @@ class Chat extends Component {
         WS.receive(message => {
             var data = JSON.parse(message.data);
 
-            if ('stream' in data) {
-                document.querySelector('#chat-stream-log').value += (data.message + '\n');
+            if (checkJson(data)) {
+                data = JSON.parse(data);
+                document.querySelector('#chat-stream-log').value = (data.message);
             } else {
                 document.querySelector('#chat-text-log').value += (data + '\n');
             }

@@ -2,6 +2,7 @@ import React, {Component} from "react";
 // import {connect} from "react-redux";
 import cookies from "./Cookies"
 import {Link} from "react-router-dom";
+import "./styles/login.css"
 
 
 class Login extends Component {
@@ -43,7 +44,7 @@ class Login extends Component {
   render() {
     return (
       <form onSubmit={this.onSubmit} action="/api/login/" method="post">
-        <fieldset>
+        <fieldset className="login-container">
           <legend>Login</legend>
           <p>
             <label htmlFor="username">Username: </label>

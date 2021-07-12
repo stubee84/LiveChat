@@ -1,16 +1,24 @@
 # from django.db.models import Q
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate
 from .models import User, Call, Caller, Message
 from .controllers.main import password_management
-from rest_framework import serializers
+from rest_framework import serializers, exceptions
 from rest_framework.validators import UniqueValidator
 
 class RegistrationSerializer(serializers.ModelSerializer):
-    email = serializers.EmailField(required=True, validators=[UniqueValidator(queryset=User.objects.all())])
-    password = serializers.CharField(min_length=8, write_only=True)
+    email = serializers.EmailField(required=True, validators=[UniqueValidator(
+        queryset=User.objects.all(),
+        message="NOT UNIQUE: email is already in use"
+        )])
+    password = serializers.CharField(min_length=9, write_only=True)
 
     def create(self, validated_data: dict):
-        return User.objects.create(email=validated_data['email'], password=password_management(password=validated_data['password']).hash())
+        user = None
+        try:
+            user = User.objects.create(email=validated_data['email'], password=password_management(password=validated_data['password']).hash())
+        except exceptions.ValidationError as e:
+            raise exceptions.ValidationError(detail=e.detail, code=e.status_code)
+        return user
 
     class Meta:
         model = User
@@ -39,12 +47,15 @@ class CallSerializer(serializers.ModelSerializer):
 class CallerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Caller
-        fields = ['number','country','city','state']
+        fields = ['number','country']
 
 class NumberSerializer(serializers.ModelSerializer):
     class Meta:
         model = Caller
         fields = ['number']
+        extra_kwargs = {
+            'number': {'validators': []},
+        }
 
 class MessageSerializer(serializers.ModelSerializer):
     number = serializers.IntegerField()
