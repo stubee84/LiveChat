@@ -1,33 +1,14 @@
-from logging import error
-import twilio.rest, os, requests, json, google.auth, threading, queue, channels.layers, ffmpeg, base64, sys
-import google.auth.transport.requests as tr_requests
-from .redis_controller import redisController
-from asgiref.sync import async_to_sync
-from channels.db import database_sync_to_async
-from dotenv import load_dotenv
 from google.cloud import storage, speech, texttospeech
 from google.resumable_media.requests import ResumableUpload
-from django.contrib.auth import hashers, password_validation
-from django.core.exceptions import ValidationError
+import google.auth.transport.requests as tr_requests
+
+from .redis import redisController
 from typing import Tuple
+from logging import error
+from asgiref.sync import async_to_sync
+from .utils import logger
 
-dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
-load_dotenv(dotenv_path=dotenv_path)
-
-ws_url = os.environ.get("WEBSOCKET_URL")
-twilio_url = "https://api.twilio.com/"
-salt = os.environ.get("SALT")
-
-class database_routines:
-    @database_sync_to_async
-    @staticmethod
-    def insert(model, **attrs):
-        model(**attrs).save(force_insert=True)
-
-    @database_sync_to_async
-    @staticmethod
-    def fetch(model, **attrs):
-        return model.objects.get(**attrs)
+import json, requests, google.auth, threading, queue, channels.layers, ffmpeg, base64, sys
 
 class google_text_to_speech:
     def __init__(self):
@@ -55,7 +36,7 @@ class google_text_to_speech:
 
             out, err = process.communicate(input=response.audio_content)
         except ffmpeg.Error as e:
-            print(e.stderr, file=sys.stderr)
+            logger.error(e.stderr, file=sys.stderr)
             return bytes(0)
 
         return out, err
@@ -98,7 +79,7 @@ class google_transcribe_speech:
             elif kwargs['destination'].lower() == "speech":
                 self.speech_client = speech.SpeechClient()
         except KeyError as e:
-            print(e)
+            logger.error(e)
             return
         
     async def start_transcriptions_stream(self, call_sid: str):
@@ -170,7 +151,7 @@ class google_transcribe_speech:
             while not upload.finished:
                 _ = upload.transmit_next_chunk(self.transport)
         else:
-            print(gc_resp.status_code)
+            logger.info(f"Google Cloud Response: {gc_resp.status_code}")
 
         return 'gs://{bucket_name}/{blob_name}'.format(self.bucket_name, recording_sid)
 
@@ -181,7 +162,7 @@ class google_transcribe_speech:
 
         operation = self.speech_client.long_running_recognize(request={"config":config,"audio":audio})
 
-        print("Waiting for operation to complete")
+        logger.info("Waiting for operation to complete")
         response = operation.result(timeout=90)
 
         for result in response.results:
@@ -219,62 +200,3 @@ class google_transcribe_speech:
                     transcription = u"{}".format(alternative.transcript)
 
         return transcription
-
-class twilio_controller:
-    sid = os.environ.get("TWILIO_ACCOUNT_SID")
-    token = os.environ.get("TWILIO_AUTH_TOKEN")
-    phone_number = os.environ.get("TWILIO_NUMBER")
-    twilio_client: twilio.rest.Client = twilio.rest.Client(username=sid,password=token)
-    call_sid: str = None
-    number: str = None
-        
-    @classmethod
-    async def twilio_send_message(cls, to_number: str, body: str, from_number: str = phone_number) -> object:
-        message = cls.twilio_client.messages.create(to=to_number,from_=from_number,body=body)
-        #TODO: possibly change this to query the URI for status once it has been sent or received
-        if message._properties["status"] == "queued":
-            cls.call_sid = message.sid
-            cls.number = message.to
-            return cls
-        return None
-
-    @classmethod
-    async def twilio_call_with_recording(cls, to_number: str, body: str, from_number: str = phone_number) -> object:
-        twiml = f'''<Response>
-            <Say>
-                {body}
-            </Say>
-        </Response>'''
-        
-        try:
-            call = cls.twilio_client.calls.create(to=to_number, from_=from_number, twiml=twiml)
-            cls.call_sid = call.sid
-            cls.number = call.to
-        except twilio.base.exceptions.TwilioException as e:
-            print(e)
-            return None
-
-        return cls
-
-    @classmethod
-    def get_call_info(cls, sid: str):
-        if sid.find('SM') == -1:
-            return cls.twilio_client.calls(sid).fetch()
-        return cls.twilio_client.messages(sid).fetch()
-
-    @classmethod
-    def get_caller_info(cls, number: str):
-        return cls.twilio_client.lookups.v1.phone_numbers(number).fetch()
-
-class password_management():
-    def __init__(self, password: str):
-        try: 
-            password_validation.validate_password(password)
-            self.password = password
-            self.salt = salt
-        except ValidationError:
-            raise ValidationError(message={"failure":password_validation.password_validators_help_texts()}, code=500)
-
-    def hash(self) -> str:
-        hasher = hashers.PBKDF2PasswordHasher()
-        return hasher.encode(password=self.password, salt=self.salt)

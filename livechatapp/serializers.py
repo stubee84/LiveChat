@@ -1,7 +1,6 @@
-# from django.db.models import Q
 from django.contrib.auth import authenticate
 from .models import User, Call, Caller, Message
-from .controllers.main import password_management
+from .controllers.utils import password_management
 from rest_framework import serializers, exceptions
 from rest_framework.validators import UniqueValidator
 

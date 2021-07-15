@@ -1,5 +1,6 @@
 from django.urls import path, re_path
-from .views.views import *
+from livechatapp.views.views import *
+from livechatapp.views.twilio_views import *
 
 urlpatterns = [
     path('rooms/', index, name='index'),
@@ -13,5 +14,5 @@ urlpatterns = [
     path('record/', record, name='record'),
     path('hangup/', hangup, name='hangup'),
     path('menu/', menu, name='menu'),
-    path('<str:room_name>/', room, name='room'),
+    # path('<str:room_name>/', room, name='room'),
 ]

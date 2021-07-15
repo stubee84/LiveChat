@@ -40,6 +40,13 @@ class Numbers extends Component {
     return false;
   }
 
+  addRow(value) {
+    var table = document.getElementById("numbers-table");
+    var row = table.insertRow(-1);
+    var cell = row.insertCell(0);
+    cell.innerHTML = value;
+  }
+
   async addNumber(event) {
     if (event.key === 'Enter' || event.keyCode === 13) {
       var number = document.getElementById("add-number").value;
@@ -54,7 +61,25 @@ class Numbers extends Component {
       }
 
       await this.send("/api/numbers/"+number+"/", "POST");
-      await this.getNumbers();
+      await this.getNumbers(number);
+    }
+  }
+
+  removeRow(value) {
+    var table = document.getElementById("numbers-table");
+    var rows = table[0].rows;
+
+    var deleted = false;
+    rows.foreach((row, i) => {
+      var cell = row.cells[0];
+      if (cell.innerHTML === value) {
+        table.deleteRow(i);
+        deleted = true;
+        return;
+      }
+    });
+    if (!deleted) {
+      alert(value + " does not exist in table");
     }
   }
 
@@ -64,8 +89,10 @@ class Numbers extends Component {
       alert("select a cell first to remove");
       return;
     }
+
     await this.send("/api/numbers/"+number+"/", "DELETE");
-    await this.getNumbers();
+    await this.getNumbers(number);
+    this.state.connectedCell = '';
   }
 
   async getMessages(number) {

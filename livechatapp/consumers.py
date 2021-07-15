@@ -1,13 +1,14 @@
 import json, base64, sys
-from livechatapp.controllers.redis_controller import redisController
-from .controllers.main import twilio_controller as tc, google_transcribe_speech, google_text_to_speech, database_routines as dr
-from .controllers.twilio import twilio_database_routine
+from livechatapp.controllers.redis import redisController
+from .controllers.utils import database_routines as dr, logger
+from .controllers.twilio import twilio_database_routine, twilio_controller as tc
+from .controllers.google import google_text_to_speech, google_transcribe_speech
 from channels.generic.websocket import AsyncWebsocketConsumer, WebsocketConsumer
 from .models import Message
 
 class DefaultUrl(WebsocketConsumer):
     def connect(self):
-        print(f"Received connection to URL {self.scope['path']} from {self.scope['client'][0]}")
+        logger.info(f"Received connection to URL {self.scope['path']} from {self.scope['client'][0]}")
         self.close()
 
 class GeneralChatConsumer(AsyncWebsocketConsumer):
@@ -74,7 +75,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             if sys.getsizeof(out_bytes) != 0:
                 if not hasattr(ChatConsumer, 'stream_sid'):
                     self.stream_sid = redisController.get(key=self.room_name)
-                    print(f"OUTBOUND STREAM SID: {self.stream_sid}")
+                    logger.info(f"OUTBOUND STREAM SID: {self.stream_sid}")
                 await text_to_speech.begin_audio_stream(streamSid=self.stream_sid, in_bytes=out_bytes)
         else:
             if 'sms' in text_data_json:
@@ -93,7 +94,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
             obj = await callable(to_number=self.room_name, body=message)
             if obj is None:
-                print("Failed to send message. {}".format(message))
+                logger.warning("Failed to send message. {}".format(message))
                 return
 
             await twilio_database_routine(number=obj.number.strip('+'), call_sid=obj.call_sid, call_type=msg_type, msg_type=msg_type, message=message)
@@ -132,7 +133,7 @@ class StreamConsumer(AsyncWebsocketConsumer):
 
         data = json.loads(text_data)
         if data['event'] == "start":
-            print(f"Media WS: Received event '{data['event']}': {text_data}")
+            logger.info(f"Media WS: Received event '{data['event']}': {text_data}")
 
             call_sid = data['start']['callSid']
             from_number = redisController.get(key=call_sid)
@@ -150,10 +151,10 @@ class StreamConsumer(AsyncWebsocketConsumer):
 
             await self.transcribe_speech.add_req_to_queue(chunk)
         elif data['event'] == "mark":
-            print(data)
+            logger.info(data)
         elif data['event'] == "stop":
-            print(f"Media WS: Received event 'stop': {text_data}")
-            print("Stopping...")
+            logger.info(f"Media WS: Received event 'stop': {text_data}")
+            logger.info("Stopping...")
             await self.transcribe_speech.end_stream()
         
         if self.transcribe_speech.stream_finished:
