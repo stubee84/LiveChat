@@ -8,7 +8,7 @@ from .models import Message
 
 class DefaultUrl(WebsocketConsumer):
     def connect(self):
-        logger.info(f"Received connection to URL {self.scope['path']} from {self.scope['client'][0]}")
+        logger.warning(f"Received connection attempt to URL {self.scope['path']} from {self.scope['client'][0]}")
         self.close()
 
 class GeneralChatConsumer(AsyncWebsocketConsumer):
@@ -18,9 +18,11 @@ class GeneralChatConsumer(AsyncWebsocketConsumer):
 
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
+        logger.info(f"Received connection to URL {self.scope['path']} from {self.scope['client'][0]}")
 
     async def disconnect(self, close_code):
         await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+        logger.info(f"Closing connection to URL {self.scope['path']} from {self.scope['client'][0]}")
 
     async def receive(self, text_data):
         text_data_json = json.loads(text_data)
@@ -51,6 +53,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
         await self.accept()
+        logger.info(f"Received connection to URL {self.scope['path']} from {self.scope['client'][0]}")
 
     async def disconnect(self, close_code):
         # Leave room group
@@ -60,6 +63,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
         if hasattr(ChatConsumer, 'stream_sid'):
             redisController.delete(key=self.room_name)
+        logger.info(f"Closing connection to URL {self.scope['path']} from {self.scope['client'][0]}")
 
     # Receive message from WebSocket
     async def receive(self, text_data):
@@ -117,6 +121,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 class StreamConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         await self.accept()
+        logger.info(f"Received connection to URL {self.scope['path']} from {self.scope['client'][0]}")
         self.transcribe_speech = google_transcribe_speech()
 
     async def disconnect(self, close_code):
@@ -124,6 +129,7 @@ class StreamConsumer(AsyncWebsocketConsumer):
             self.room_group_name,
             self.channel_name
         )
+        logger.info(f"Closing connection to URL {self.scope['path']} from {self.scope['client'][0]}")
         redisController.delete(key=self.room_group_name)
 
     async def receive(self, text_data):

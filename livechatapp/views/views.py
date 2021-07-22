@@ -40,16 +40,19 @@ class UserLogin(generics.CreateAPIView):
         try:
             serializer.is_valid(raise_exception=True)
             user = serializer.validated_data
-
             if user is not None:
-                login(request=request, user=user)
+                try:
+                    login(request=request, user=user)
+                except Exception as e:
+                    logger.error(e)
+                    return
                 return response.Response(data={
                     "user": UserSerializer(user, context=self.get_serializer_context()).data
                     }, status=status.HTTP_201_CREATED)
             else:
                 logger.warning(f'failed to login user: {user}')
         except BaseException as err:
-            logger.error(f'error: {err}')
+            logger.error(f'{err}')
             return response.Response(status=status.HTTP_400_BAD_REQUEST)
 
 @method_decorator(all_decorators, name="get")

@@ -1,4 +1,5 @@
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, password_validation
+from livechatapp.controllers.utils import logger
 from .models import User, Call, Caller, Message
 from .controllers.utils import password_management
 from rest_framework import serializers, exceptions

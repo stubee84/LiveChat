@@ -1,7 +1,7 @@
-from djongo import models
+from django.db import models
 
 class User(models.Model):
-    id = models.ObjectIdField()
+    id = models.AutoField(primary_key=True)
     is_active = models.BooleanField(default=True, null=False)
     email = models.CharField(max_length=30, unique=True, null=False, blank=False)
     password = models.CharField(max_length=30, null=False, blank=False)
@@ -13,14 +13,14 @@ class User(models.Model):
         return True
 
 class Caller(models.Model):
-    id = models.ObjectIdField()
+    id = models.AutoField(primary_key=True)
     number = models.CharField(max_length=15, unique=True)
     country = models.CharField(max_length=10)
     city = models.CharField(max_length=30)
     state = models.CharField(max_length=10)
 
 class Call(models.Model):
-    id = models.ObjectIdField()
+    id = models.AutoField(primary_key=True)
     sid = models.CharField(max_length=50, unique=True)
     length_of_call = models.IntegerField()
     caller_id = models.IntegerField()
@@ -32,7 +32,7 @@ class Call(models.Model):
     call_type = models.CharField(max_length=1, choices=CALL_TYPES)
 
 class Message(models.Model):
-    id = models.ObjectIdField()
+    id = models.AutoField(primary_key=True)
     call_id = models.IntegerField()
     number = models.IntegerField()
     MESSAGE_TYPES = (

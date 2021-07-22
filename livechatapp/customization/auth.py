@@ -1,7 +1,7 @@
 import django.http.request as request
 from django.contrib.auth.backends import BaseBackend
 from django.contrib.auth.hashers import check_password
-from ..models import User
+from livechatapp.models import User
 
 class CustomAuth(BaseBackend):
     def authenticate(self, request: request.HttpRequest = None, username: str = None, password: str = None) -> User:

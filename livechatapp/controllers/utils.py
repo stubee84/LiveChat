@@ -11,6 +11,30 @@ ws_url = os.environ.get("WEBSOCKET_URL")
 twilio_url = "https://api.twilio.com/"
 salt = os.environ.get("SALT")
 
+class database_routines:
+    @staticmethod
+    @database_sync_to_async
+    def insert(model, **attrs):
+        model(**attrs).save(force_insert=True)
+
+    @staticmethod
+    @database_sync_to_async
+    def fetch(model, **attrs):
+        return model.objects.get(**attrs)
+
+class password_management():
+    def __init__(self, password: str):
+        try: 
+            password_validation.validate_password(password)
+            self.password = password
+            self.salt = salt
+        except ValidationError:
+            raise ValidationError(message={"failure":password_validation.password_validators_help_texts()}, code=500)
+
+    def hash(self) -> str:
+        hasher = hashers.PBKDF2PasswordHasher()
+        return hasher.encode(password=self.password, salt=self.salt)
+
 def extract_values_from_error(err: dict) -> str:
     items = str()
     for v in err.values():
@@ -30,7 +54,7 @@ def setup_logging(path: str) -> logging.Logger:
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
     shandler = logging.StreamHandler(sys.stdout)
-    fhandler = logging.FileHandler(filename=f"{path}/WikipediaGame_{unix_time}.log")
+    fhandler = logging.FileHandler(filename=f"{path}/LiveChat_{unix_time}.log")
     shandler.setFormatter(formatter)
     fhandler.setFormatter(formatter)
 
@@ -38,28 +62,4 @@ def setup_logging(path: str) -> logging.Logger:
     logger.addHandler(fhandler)
     return logger
 
-logger = setup_logging(os.environ.get('logging_path'))
-
-class database_routines:
-    @database_sync_to_async
-    @staticmethod
-    def insert(model, **attrs):
-        model(**attrs).save(force_insert=True)
-
-    @database_sync_to_async
-    @staticmethod
-    def fetch(model, **attrs):
-        return model.objects.get(**attrs)
-
-class password_management():
-    def __init__(self, password: str):
-        try: 
-            password_validation.validate_password(password)
-            self.password = password
-            self.salt = salt
-        except ValidationError:
-            raise ValidationError(message={"failure":password_validation.password_validators_help_texts()}, code=500)
-
-    def hash(self) -> str:
-        hasher = hashers.PBKDF2PasswordHasher()
-        return hasher.encode(password=self.password, salt=self.salt)
+logger = setup_logging(os.environ.get("LOGGING_PATH"))

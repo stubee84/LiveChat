@@ -1,9 +1,7 @@
-from collections import OrderedDict
 from django.urls import reverse
-from django.test import TestCase
 from rest_framework import test, status
-from ..models import User, Caller, Message
-from ..controllers.main import password_management
+from livechatapp.models import User, Caller, Message
+from livechatapp.controllers.utils import password_management
 
 '''
     command: python.exe .\manage.py test livechatapp.tests.sync_tests.UserCreateTest

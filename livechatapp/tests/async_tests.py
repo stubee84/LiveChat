@@ -1,7 +1,7 @@
 from channels.testing import WebsocketCommunicator
-from ..consumers import GeneralChatConsumer
-from ..models import Message
-from ..controllers.main import database_routines as dr
+from livechatapp.consumers import GeneralChatConsumer
+from livechatapp.models import Message
+from livechatapp.controllers.utils import database_routines as dr
 import json, pytest
 
 @pytest.mark.asyncio
