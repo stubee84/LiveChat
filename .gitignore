@@ -8,6 +8,7 @@ LiveChat/.env
 *.mp3
 *.wav
 *.raw
+*.json
 livechatapp/__pycache__/
 livechatapp/controllers/__pycache__/
 livechatapp/migrations/
